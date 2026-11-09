@@ -32,6 +32,19 @@ services:
     command: ["python", "-u", "/app/server.py", "--port", "9100"]
     volumes: ["./tools/mock_picking:/app:ro"]
     ports: ["9100:9100"]
+    environment:
+      # set in .env before exposing the mock through the tunnel; then POSTs need header x-api-key
+      MOCK_API_KEY: ${MOCK_PICKING_API_KEY:-}
+    restart: unless-stopped
+
+  # Public HTTPS address for the mock, so a cloud-hosted SOFTBOT platform can reach it.
+  # Only starts with:  docker compose --profile tunnel up --build
+  # The address (https://<random>.trycloudflare.com) is printed in this service's log and changes on restart.
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.1
+    command: ["tunnel", "--no-autoupdate", "--url", "http://mock-picking:9100"]
+    depends_on: [mock-picking]
+    profiles: ["tunnel"]
     restart: unless-stopped
 
 volumes:

@@ -8,7 +8,9 @@ Accepts what an outbound signal_to_http SOFTBOT sends and answers like a healthy
   GET  /health             200 "ok"
 
 Authentication is accepted whatever it is (none, x-api-key, Basic, Bearer) and shown on the page.
-Set --api-key / --basic to *require* a specific credential instead.
+Set --api-key / --basic to *require* a specific credential instead. With an API key set (also via the
+MOCK_API_KEY environment variable) the messages page needs it too: open /?key=<key>. Use this whenever
+the mock is reachable from the internet (e.g. through a tunnel).
 
 Testing failure handling: add ?status=503 (or any code) to the SOFTBOT's URL path, or start with
 --status 500 / --delay 5 to make every response fail or be slow.
@@ -19,6 +21,7 @@ import argparse
 import base64
 import html
 import json
+import os
 import secrets
 import threading
 import time
@@ -109,8 +112,16 @@ def make_handler(args):
             self.end_headers()
             self.wfile.write(data)
 
+        def _viewer_ok(self) -> bool:
+            if not args.api_key:
+                return True
+            q = parse_qs(urlparse(self.path).query)
+            return args.api_key in (q.get("key", [None])[0], self.headers.get(args.api_key_header))
+
         def do_GET(self):
             p = urlparse(self.path).path
+            if p not in ("/health",) and not self._viewer_ok():
+                return self._send(401, text="API key required: open /?key=<your key>", ctype="text/plain")
             if p == "/health":
                 return self._send(200, text="ok", ctype="text/plain")
             if p == "/_messages":
@@ -121,6 +132,8 @@ def make_handler(args):
             return self._send(404, {"error": "not found"})
 
         def do_DELETE(self):
+            if not self._viewer_ok():
+                return self._send(401, {"error": "API key required"})
             if urlparse(self.path).path == "/_messages":
                 with LOCK:
                     MESSAGES.clear()
@@ -183,11 +196,14 @@ def main() -> None:
     p.add_argument("--port", type=int, default=9100)
     p.add_argument("--status", type=int, default=200, help="status code for every message (default 200)")
     p.add_argument("--delay", type=float, default=0.0, help="seconds to wait before answering")
-    p.add_argument("--api-key", help="require this API key (otherwise any auth is accepted)")
-    p.add_argument("--api-key-header", default="x-api-key")
+    p.add_argument("--api-key", default=os.environ.get("MOCK_API_KEY") or None,
+                   help="require this API key (otherwise any auth is accepted); env MOCK_API_KEY")
+    p.add_argument("--api-key-header", default=os.environ.get("MOCK_API_KEY_HEADER", "x-api-key"))
     p.add_argument("--basic", help="require Basic auth 'user:password'")
     a = p.parse_args()
     print(f"Mock picking system on http://{a.host}:{a.port}/  (messages page at /, Ctrl+C to stop)", flush=True)
+    if a.api_key:
+        print(f"API key required: header '{a.api_key_header}' on POSTs; open the page as /?key=<key>", flush=True)
     ThreadingHTTPServer((a.host, a.port), make_handler(a)).serve_forever()
 
 
