@@ -86,6 +86,7 @@ export default function OrderDetail() {
               <div>{[o.ship_city, o.ship_state, o.ship_postal_code].filter(Boolean).join(", ")}</div>
               <div>{o.ship_country}</div>
               <dl className="kv" style={{ marginTop: 14 }}>
+                <dt>Category</dt><dd>{o.category ?? "—"}</dd>
                 <dt>Method</dt><dd>{o.ship_method ?? "—"}</dd>
                 <dt>Priority</dt><dd>{o.priority}</dd>
                 {o.customer_email && <><dt>Email</dt><dd>{o.customer_email}</dd></>}

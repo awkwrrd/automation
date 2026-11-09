@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,6 +8,7 @@ from .models import (
     AuthType,
     IntegrationEvent,
     InboundType,
+    PayloadFormat,
     InventoryStatus,
     LocationType,
     Role,
@@ -153,6 +154,7 @@ class ItemIn(BaseModel):
     brand: str | None = None
     supplier_id: int | None = None
     uom: str = "EA"
+    unit_type: str | None = "EACH"
     unit_cost: Decimal | None = None
     price: Decimal | None = None
     weight: Decimal | None = None
@@ -318,6 +320,7 @@ class OrderIn(BaseModel):
     warehouse_id: int
     external_id: str | None = None
     channel: str = "MANUAL"
+    category: str | None = "STANDARD"
     priority: int = Field(5, ge=1, le=9)
     customer_name: str | None = None
     customer_email: str | None = None
@@ -380,6 +383,7 @@ class OrderSummary(ORM):
     number: str
     external_id: str | None
     channel: str
+    category: str | None = None
     status: str
     priority: int
     warehouse_id: int
@@ -546,6 +550,9 @@ class EndpointIn(BaseModel):
     max_attempts: int = Field(8, ge=1, le=50)
     assign_tasks: bool = True
     active: bool = True
+    payload_format: PayloadFormat = PayloadFormat.STANDARD
+    field_names: dict[str, str] = Field(default_factory=dict, description="Rename keys anywhere in the message")
+    static_fields: dict[str, Any] = Field(default_factory=dict, description="Merged into every message (top level)")
 
 
 class EndpointOut(BaseModel):
@@ -565,6 +572,9 @@ class EndpointOut(BaseModel):
     assign_tasks: bool
     active: bool
     created_at: datetime
+    payload_format: str
+    field_names: dict[str, str]
+    static_fields: dict[str, Any]
     pending: int = 0
     failed: int = 0
     last_sent_at: datetime | None = None

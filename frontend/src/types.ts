@@ -8,7 +8,7 @@ export interface User { id: number; username: string; full_name: string; email: 
 export interface Meta {
   app_name: string; roles: Role[]; zone_types: string[]; location_types: string[]; inventory_statuses: string[];
   order_statuses: string[]; task_types: string[]; task_statuses: string[]; txn_types: string[];
-  inbound_types: string[]; adjust_reasons: string[];
+  inbound_types: string[]; adjust_reasons: string[]; unit_types: string[]; order_categories: string[];
 }
 
 export interface Warehouse {
@@ -25,7 +25,7 @@ export interface Supplier { id: number; code: string; name: string; contact_name
 
 export interface Item {
   id: number; sku: string; name: string; description: string | null; barcode: string | null; category: string | null;
-  brand: string | null; supplier_id: number | null; uom: string; unit_cost: string | null; price: string | null;
+  brand: string | null; supplier_id: number | null; uom: string; unit_type: string | null; unit_cost: string | null; price: string | null;
   weight: string | null; weight_unit: string; length: string | null; width: string | null; height: string | null;
   dim_unit: string; reorder_point: number; reorder_qty: number; lot_tracked: boolean; default_location_id: number | null;
   default_location: Ref | null; image_url: string | null; active: boolean; shopify_product_id: string | null;
@@ -64,7 +64,7 @@ export interface Shipment {
   packed_at: string; shipped_at: string | null;
 }
 export interface Order {
-  id: number; number: string; external_id: string | null; channel: string; status: string; priority: number;
+  id: number; number: string; external_id: string | null; channel: string; category: string | null; status: string; priority: number;
   warehouse_id: number; wave: { id: number; number: string } | null; customer_name: string | null;
   ship_city: string | null; ship_state: string | null; ship_method: string | null; requested_ship_date: string | null;
   created_at: string; shipped_at: string | null; units: number; line_count: number;
@@ -100,6 +100,7 @@ export interface Endpoint {
   auth_type: "NONE" | "BEARER" | "BASIC" | "HEADER"; auth_header: string | null; auth_value_hint: string | null;
   has_signing_secret: boolean; extra_headers: Record<string, string>; timeout_seconds: number; max_attempts: number;
   assign_tasks: boolean; active: boolean; created_at: string; pending: number; failed: number; last_sent_at: string | null;
+  payload_format: "STANDARD" | "ORDER"; field_names: Record<string, string>; static_fields: Record<string, unknown>;
 }
 export interface OutMessage {
   id: number; endpoint_id: number; endpoint_name: string; event: string; reference: string | null; status: string;

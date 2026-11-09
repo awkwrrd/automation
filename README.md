@@ -68,7 +68,7 @@ WMS_DATABASE_URL=postgresql+psycopg://user:pass@localhost/wms_test pytest  # Pos
 | **Transaction History** | Every quantity change is written to an immutable log. Filter by item, type, reference, user and date |
 | **Replenishment report** | Items at or below their reorder point, with suggested order qty and cost |
 | **Configuration** | Multi-warehouse, zones, locations (plus bulk generation such as aisles A–D × bays 1–10 × levels 1–4), suppliers, users |
-| **Integrations** | Push events (`wave.released`, `order.released`, `putaway.created`, `task.cancelled`) to external systems such as a robotics platform, routed by warehouse and zone. Signed (HMAC), ordered, retried, with a message log. API keys + a bulk task-confirmation API for the response leg. See [docs/SOFTBOT_INTEGRATION.md](docs/SOFTBOT_INTEGRATION.md) |
+| **Integrations** | Push events (`wave.released`, `order.released`, `putaway.created`, `task.cancelled`) to external systems such as a robotics platform, routed by warehouse and zone, as standard events or one PascalCase message per order (field renames and fixed fields configurable). Signed (HMAC), ordered, retried, with a message log. API keys + a bulk task-confirmation API for the response leg. See [docs/SOFTBOT_INTEGRATION.md](docs/SOFTBOT_INTEGRATION.md) |
 | **Security** | Token auth with three roles: **Operator** (floor execution), **Supervisor** (adjustments, order/wave/count control, item master), **Admin** (config & users) |
 
 ### Inventory model (important for Shopify sync)

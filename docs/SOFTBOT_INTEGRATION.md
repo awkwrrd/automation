@@ -32,6 +32,11 @@ The WMS **pushes** events to external systems over HTTPS (JSON `POST`). Your sys
    | Signing secret | Click **Generate** and copy it into SOFTBOT. Every request is then HMAC-signed (see §4) |
    | Timeout / Max attempts | Defaults 10 s / 8 attempts. Retries back off 10 s, 20 s, 40 s … up to 15 min |
    | Extra headers | Optional static headers as JSON, e.g. `{"X-Site": "DC1"}` |
+   | Message format | **Standard event** (§3) or **Per order** (§3a): one flat PascalCase message per order |
+   | Rename fields | JSON map applied to keys at any depth, e.g. `{"Lines": "OrderLines", "Sku": "ItemCode"}` |
+   | Always include | JSON object merged into every message, e.g. `{"SendToPaccurate": true}` |
+
+   Use **Preview message** to see the exact JSON before saving.
 
 4. Click **Send test**. You should see `SENT · HTTP 200` and SOFTBOT should log a `test` event.
 5. Release a wave (*Orders → select → Create wave*). Watch *Configuration → Message Log* for its delivery.
@@ -184,6 +189,45 @@ Example `wave.released` (trimmed to one order and one task):
 - `putaway.created`: `data.receipt` + `data.tasks` (from the dock to the suggested storage location; routed by the destination zone).
 - `task.cancelled`: `data.reason` + `data.tasks[] = {task_id, task_type, order_id, reference, sku, qty, qty_done}`.
   Sent when an order is cancelled/unallocated or a supervisor cancels a task. Stop any work on those ids.
+
+### 3a. Per-order format
+
+With *Message format = Per order*, every event is sent as one flat message **per order**: a wave of
+3 orders is 3 messages, in order. Same headers as above. Example (trimmed):
+
+```json
+{
+  "Event": "wave.released", "DeliveryId": 42, "SchemaVersion": "1.0", "IsTest": false,
+  "OccurredAt": "2026-11-09T15:14:22Z", "Warehouse": "DC1", "WaveNumber": "WAV000007",
+  "OrderId": 31, "OrderNumber": "ORD000031", "ExternalOrderId": "#1042", "Channel": "SHOPIFY",
+  "Category": "CONSOLIDATION", "Priority": 5, "ShipMethod": "Ground", "RequestedShipDate": null,
+  "Customer": {"Name": "Jordan Smith", "Email": null, "Phone": null},
+  "ShipTo": {"Name": "Jordan Smith", "Address1": "100 Main St", "Address2": null, "City": "Austin",
+             "State": "TX", "PostalCode": "78701", "Country": "US"},
+  "Notes": null,
+  "Lines": [{
+    "LineNumber": 1, "ExternalLineId": null, "Sku": "RBN-SATIN", "Description": "Satin ribbon",
+    "Barcode": "0123456789012", "UnitOfMeasure": "FT", "UnitType": "LINEAR",
+    "Weight": 0.1, "WeightUnit": "lb", "Length": 12, "Width": 1, "Height": 0.2, "DimensionUnit": "in",
+    "LotTracked": false, "Quantity": 25, "QuantityToPick": 25,
+    "Tasks": [{"TaskId": 118, "TaskType": "PICK", "Quantity": 25, "LotNumber": null, "Priority": 5,
+               "FromLocation": {"Code": "R9-01-01", "Zone": "AMR", "Type": "BIN", "Aisle": "R9",
+                                "Bay": "01", "Level": "01", "Position": null, "Sequence": 610},
+               "ToLocation": {"Code": "STAGE-01", "Zone": "SHP", "Type": "STAGING", "...": "..."}}]
+  }],
+  "Callbacks": {"ConfirmTasks": "http://wms:8000/api/automation/confirmations"}
+}
+```
+- `Lines` always lists **every** line of the order. `Tasks` / `QuantityToPick` only cover work routed to
+  this endpoint (lines picked by people elsewhere have `"Tasks": []`, `QuantityToPick: 0`).
+- `UnitType` comes from the item (*Items → Unit type*: EACH, LINEAR, …). `Category` comes from the order
+  (*New order → Category*: STANDARD, CONSOLIDATION, …).
+- `putaway.created` uses the same shape with `ReceiptNumber`, `Category: "PUTAWAY"` and one line per task.
+- `task.cancelled` uses the same shape (one message per order) with `Reason`, and each line's `Quantity`,
+  `QuantityDone` and `Tasks: [{TaskId, TaskType}]`.
+- **Send test** sends a realistic sample order with `"IsTest": true`, `"OrderNumber": "TEST-0001"` and
+  `TaskId: 0`, so the receiver's normal processing can run on it. Don't fulfil messages with `IsTest: true`.
+- Confirm work with the `TaskId`s via §5, exactly as in the standard format.
 
 **Delivery guarantees**
 - Messages are written in the same DB transaction as the change (no lost or phantom events).

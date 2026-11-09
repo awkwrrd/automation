@@ -28,8 +28,8 @@ def me(user: User = Depends(current_user)):
 @router.get("/meta")
 def meta():
     """Public metadata the UI needs (enums, app name)."""
-    from ..models import (InboundType, InventoryStatus, LocationType, OrderStatus, TaskStatus,
-                          TaskType, TxnType, ZoneType)
+    from ..models import (ORDER_CATEGORIES, UNIT_TYPES, InboundType, InventoryStatus, LocationType,
+                          OrderStatus, TaskStatus, TaskType, TxnType, ZoneType)
     return {
         "app_name": settings.app_name,
         "roles": [r.value for r in Role],
@@ -41,6 +41,8 @@ def meta():
         "task_statuses": [z.value for z in TaskStatus],
         "txn_types": [z.value for z in TxnType],
         "inbound_types": [z.value for z in InboundType],
+        "unit_types": UNIT_TYPES,
+        "order_categories": ORDER_CATEGORIES,
         "adjust_reasons": ["DAMAGED", "FOUND", "LOST", "EXPIRED", "SAMPLE", "RETURN", "DATA_CORRECTION", "OTHER"],
     }
 

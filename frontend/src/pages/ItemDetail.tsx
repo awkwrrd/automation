@@ -6,14 +6,14 @@ import { AdjustModal, MoveModal } from "../components/InventoryActions";
 import { Card, DataTable, ErrorBox, Field, Input, LocationPicker, PageHeader, Pill, Select, Stat, fmtDate, fmtDateTime, fmtNum, useAction, useLoad } from "../components/ui";
 import type { Balance, Item, Page, Supplier, Txn } from "../types";
 
-const BLANK: Partial<Item> = { sku: "", name: "", uom: "EA", weight_unit: "lb", dim_unit: "in", reorder_point: 0, reorder_qty: 0, lot_tracked: false, active: true };
+const BLANK: Partial<Item> = { sku: "", name: "", uom: "EA", unit_type: "EACH", weight_unit: "lb", dim_unit: "in", reorder_point: 0, reorder_qty: 0, lot_tracked: false, active: true };
 const NUM_FIELDS = ["unit_cost", "price", "weight", "length", "width", "height"] as const;
 
 export default function ItemDetail() {
   const { id } = useParams();
   const isNew = id === "new";
   const nav = useNavigate();
-  const { can } = useApp();
+  const { can, meta } = useApp();
   const { busy, run } = useAction();
   const [form, setForm] = useState<Partial<Item>>(BLANK);
   const [modal, setModal] = useState<"adjust" | "move" | null>(null);
@@ -70,6 +70,10 @@ export default function ItemDetail() {
             <Select value={form.supplier_id ?? ""} disabled={!editable} onChange={(e) => set("supplier_id", e.target.value)} placeholder="—" options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: s.name }))} />
           </Field>
           <Field label="Unit of measure">{txt("uom")}</Field>
+          <Field label="Unit type" hint="Sent to automation, e.g. LINEAR for goods sold by length">
+            <Select value={form.unit_type ?? ""} disabled={!editable} onChange={(e) => set("unit_type", e.target.value || null)} placeholder="—"
+              options={[...new Set([...(meta?.unit_types ?? []), ...(form.unit_type ? [form.unit_type] : [])])]} />
+          </Field>
           <div className="form-section">Pricing & replenishment</div>
           <Field label="Unit cost">{txt("unit_cost", { type: "number", step: "0.01" })}</Field>
           <Field label="Sell price">{txt("price", { type: "number", step: "0.01" })}</Field>

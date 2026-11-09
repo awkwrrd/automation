@@ -228,3 +228,112 @@ def test_existing_db_gets_new_columns(tmp_path):
     added = add_missing_columns(eng)
     assert "tasks.dispatch_endpoint_id" in added
     assert "dispatch_endpoint_id" in {c["name"] for c in inspect(eng).get_columns("tasks")}
+
+
+# ------------------------------------------------------------------ per-order (PascalCase) format
+USER_WORKFLOW_SCRIPT = r"""
+const output = JSON.parse(activities.TransformJsonActivity_1.Output());
+let isLinearGood = false;
+let isConsolidation = false;
+output.Lines.map((line) => {
+    if (line.UnitType.toLowerCase() === "linear") {
+        isLinearGood = true;
+    }
+})
+if (output.Category.toLowerCase() === "consolidation") {
+    isConsolidation = true;
+}
+return isLinearGood && (SendToPaccurate || isConsolidation);
+"""
+
+
+def run_workflow_script(message: dict, send_to_paccurate: bool) -> bool:
+    """Execute the platform's If.Condition script exactly as written, with the transform passing the
+    WMS message through unchanged. Raises if the script throws (what faulted the Elsa workflow)."""
+    import shutil
+    import subprocess
+    if not shutil.which("node"):
+        pytest.skip("node not installed")
+    js = (f"const activities = {{TransformJsonActivity_1: {{Output: () => {json.dumps(json.dumps(message))}}}}};\n"
+          f"const SendToPaccurate = {str(send_to_paccurate).lower()};\n"
+          f"const r = (() => {{ {USER_WORKFLOW_SCRIPT} }})();\nconsole.log(JSON.stringify(r));")
+    out = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+def _endpoint_body(ep: dict, **changes) -> dict:
+    body = {**ep, **changes}
+    for k in ("id", "auth_value_hint", "has_signing_secret", "created_at", "pending", "failed", "last_sent_at"):
+        body.pop(k, None)
+    return body
+
+
+def test_order_format(client, admin, setup, receiver, http):
+    # hand the robot zone to a new per-order endpoint
+    ok(client.put(f"/api/automation/endpoints/{setup['ep']['id']}", headers=admin,
+                  json=_endpoint_body(setup["ep"], active=False)))
+    ep = ok(client.post("/api/automation/endpoints", headers=admin, json={
+        "name": "SOFTBOT-ORDERS", "url": receiver, "warehouse_id": 1, "zone_ids": [setup["zone"]["id"]],
+        "events": ["wave.released", "order.released", "task.cancelled", "test"], "payload_format": "ORDER"}), 201)
+    try:
+        item = ok(client.get(f"/api/items/{setup['robo_item']['id']}", headers=admin))
+        ok(client.put(f"/api/items/{item['id']}", headers=admin, json={**item, "unit_type": "LINEAR"}))
+
+        # Test button: sample order in the same shape -> the platform script runs without faulting
+        Receiver.received.clear()
+        res = ok(client.post(f"/api/automation/endpoints/{ep['id']}/test", headers=admin))
+        assert res["status"] == "SENT"
+        sample = json.loads(Receiver.received[-1][1])
+        assert sample["IsTest"] is True and sample["OrderNumber"] == "TEST-0001" and sample["Lines"]
+        assert run_workflow_script(sample, False) is False
+
+        o1 = ok(client.post("/api/orders", headers=admin, json={
+            "warehouse_id": 1, "category": "CONSOLIDATION", "customer_name": "Consolidator",
+            "lines": [{"item_id": setup["robo_item"]["id"], "qty_ordered": 2},
+                      {"item_id": setup["manual_item"]["id"], "qty_ordered": 1}]}), 201)
+        o2 = ok(client.post("/api/orders", headers=admin, json={
+            "warehouse_id": 1, "lines": [{"item_id": setup["robo_item"]["id"], "qty_ordered": 1}]}), 201)
+        assert o2["category"] == "STANDARD"
+        wave = ok(client.post("/api/waves", headers=admin, json={"warehouse_id": 1, "order_ids": [o1["id"], o2["id"]]}), 201)
+        Receiver.received.clear()
+        ok(client.post(f"/api/waves/{wave['id']}/release", headers=admin))
+        drain(http)
+
+        msgs = [json.loads(b) for _, b in Receiver.received]
+        assert [m["OrderNumber"] for m in msgs] == [o1["number"], o2["number"]]     # one message per order
+        m1 = msgs[0]
+        assert m1["Event"] == "wave.released" and m1["WaveNumber"] == wave["number"] and m1["Category"] == "CONSOLIDATION"
+        assert m1["DeliveryId"] == int(Receiver.received[0][0]["x-wms-delivery"])
+        robo_line = next(l for l in m1["Lines"] if l["Sku"] == "AMR-1")
+        manual_line = next(l for l in m1["Lines"] if l["Sku"] == "MAN-1")
+        assert robo_line["UnitType"] == "LINEAR" and robo_line["Quantity"] == 2 and robo_line["QuantityToPick"] == 2
+        assert robo_line["Tasks"][0]["FromLocation"]["Zone"] == "AMR" and robo_line["Tasks"][0]["TaskId"] > 0
+        assert manual_line["Tasks"] == [] and manual_line["QuantityToPick"] == 0   # picked by people, not sent
+
+        # the user's workflow condition, unchanged
+        assert run_workflow_script(m1, False) is True       # linear + consolidation
+        assert run_workflow_script(msgs[1], False) is False  # linear, standard order, no Paccurate
+        assert run_workflow_script(msgs[1], True) is True
+
+        # cancellation keeps the same shape (Lines + Category) so the same workflow can't fault on it
+        Receiver.received.clear()
+        ok(client.post(f"/api/orders/{o2['id']}/cancel", headers=admin))
+        drain(http)
+        cancel = json.loads(Receiver.received[-1][1])
+        assert cancel["Event"] == "task.cancelled" and cancel["OrderNumber"] == o2["number"]
+        assert cancel["Lines"][0]["UnitType"] == "LINEAR" and cancel["Category"] == "STANDARD"
+        run_workflow_script(cancel, False)
+
+        # renames + static fields, checked via Preview and on the wire
+        cfg = _endpoint_body(ep, field_names={"Lines": "OrderLines", "Sku": "ItemCode"},
+                             static_fields={"SendToPaccurate": True, "Source": "WMS"})
+        preview = ok(client.post("/api/automation/endpoints/preview", headers=admin, json=cfg))
+        assert "Lines" not in preview and preview["OrderLines"][0]["ItemCode"] and preview["SendToPaccurate"] is True
+        ok(client.put(f"/api/automation/endpoints/{ep['id']}", headers=admin, json=cfg))
+        Receiver.received.clear()
+        ok(client.post(f"/api/automation/endpoints/{ep['id']}/test", headers=admin))
+        wire = json.loads(Receiver.received[-1][1])
+        assert wire["Source"] == "WMS" and "OrderLines" in wire
+    finally:
+        ok(client.put(f"/api/automation/endpoints/{ep['id']}", headers=admin, json=_endpoint_body(ep, active=False)))

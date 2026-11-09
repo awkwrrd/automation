@@ -13,10 +13,10 @@ const FIELDS: [string, string, number?][] = [
 ];
 
 export default function OrderNew() {
-  const { warehouseId } = useApp();
+  const { warehouseId, meta } = useApp();
   const nav = useNavigate();
   const { busy, run } = useAction();
-  const [h, setH] = useState<Record<string, string>>({ channel: "MANUAL", priority: "5", ship_country: "US", ship_method: "Ground" });
+  const [h, setH] = useState<Record<string, string>>({ channel: "MANUAL", category: "STANDARD", priority: "5", ship_country: "US", ship_method: "Ground" });
   const [lines, setLines] = useState<DraftLine[]>([]);
   const set = (k: string, v: string) => setH((x) => ({ ...x, [k]: v }));
   const save = async () => {
@@ -34,6 +34,7 @@ export default function OrderNew() {
         <div className="form-grid">
           <Field label="Channel"><Select value={h.channel} onChange={(e) => set("channel", e.target.value)} options={["MANUAL", "SHOPIFY", "PHONE", "WHOLESALE"]} /></Field>
           <Field label="Channel order # (external id)"><Input value={h.external_id ?? ""} onChange={(e) => set("external_id", e.target.value)} /></Field>
+          <Field label="Category" hint="Sent to automation, e.g. CONSOLIDATION"><Select value={h.category} onChange={(e) => set("category", e.target.value)} options={meta?.order_categories ?? ["STANDARD"]} /></Field>
           <Field label="Priority" hint="1 = highest"><Select value={h.priority} onChange={(e) => set("priority", e.target.value)} options={["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((p) => ({ value: p, label: p }))} /></Field>
           <Field label="Ship method"><Input value={h.ship_method ?? ""} onChange={(e) => set("ship_method", e.target.value)} /></Field>
           <Field label="Requested ship date"><Input type="date" value={h.requested_ship_date ?? ""} onChange={(e) => set("requested_ship_date", e.target.value)} /></Field>

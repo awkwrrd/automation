@@ -48,7 +48,9 @@ def _ep_out(db: Session, ep: IntegrationEndpoint) -> EndpointOut:
         auth_value_hint=_hint(ep.auth_value), has_signing_secret=bool(ep.signing_secret),
         extra_headers=json.loads(ep.extra_headers) if ep.extra_headers else {},
         timeout_seconds=ep.timeout_seconds, max_attempts=ep.max_attempts, assign_tasks=ep.assign_tasks,
-        active=ep.active, created_at=ep.created_at, pending=counts.get(MessageStatus.PENDING, 0),
+        active=ep.active, created_at=ep.created_at, payload_format=ep.payload_format or "STANDARD",
+        field_names=json.loads(ep.field_names) if ep.field_names else {},
+        static_fields=json.loads(ep.static_fields) if ep.static_fields else {}, pending=counts.get(MessageStatus.PENDING, 0),
         failed=counts.get(MessageStatus.FAILED, 0),
         last_sent_at=db.scalar(select(func.max(OutboundMessage.sent_at)).where(OutboundMessage.endpoint_id == ep.id)),
     )
@@ -71,6 +73,9 @@ def _apply(ep: IntegrationEndpoint, body: EndpointIn) -> None:
     ep.extra_headers = json.dumps(body.extra_headers) if body.extra_headers else None
     ep.timeout_seconds, ep.max_attempts = body.timeout_seconds, body.max_attempts
     ep.assign_tasks, ep.active = body.assign_tasks, body.active
+    ep.payload_format = body.payload_format
+    ep.field_names = json.dumps(body.field_names) if body.field_names else None
+    ep.static_fields = json.dumps(body.static_fields) if body.static_fields else None
 
 
 # ------------------------------------------------------------------ endpoints
@@ -130,8 +135,8 @@ def generate_secret(ep_id: int, db: Session = Depends(get_db)):
 def test_endpoint(ep_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Send a `test` event right now (bypassing the queue) and return the result."""
     ep = get_or_404(db, IntegrationEndpoint, ep_id, "Endpoint")
-    msg = integrations.enqueue(db, ep, IntegrationEvent.TEST, "TEST", ep.warehouse_id,
-                               {"message": f"Test from {user.username}", "endpoint": ep.name})
+    body, raw = _test_body(db, ep, user.username)
+    msg = integrations.enqueue(db, ep, IntegrationEvent.TEST, "TEST", ep.warehouse_id, body, raw=raw)
     with httpx.Client() as client:
         if ep.active:
             dispatcher.deliver(db, msg, client)
@@ -140,6 +145,27 @@ def test_endpoint(ep_id: int, db: Session = Depends(get_db), user: User = Depend
     if msg.status == MessageStatus.PENDING:  # don't keep retrying a test message
         msg.status = MessageStatus.FAILED
     return _msg_out(msg, detail=True)
+
+
+def _test_body(db: Session, ep: IntegrationEndpoint, username: str) -> tuple[dict, bool]:
+    """(body, raw) for a test message. ORDER-format endpoints get a sample order in their exact shape
+    (IsTest=true, OrderNumber TEST-0001) so receivers can run their normal processing on it."""
+    if integrations.is_order_format(ep):
+        return integrations.sample_order_message(db, ep.warehouse_id), True
+    return {"message": f"Test from {username}", "endpoint": ep.name}, False
+
+
+@router.post("/endpoints/preview", dependencies=[admin])
+def preview_endpoint(body: EndpointIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Show the test/sample message exactly as an endpoint with these (unsaved) settings would send it."""
+    ep = IntegrationEndpoint()
+    _apply(ep, body)
+    data, raw = _test_body(db, ep, user.username)
+    if raw:
+        return integrations.shape(ep, {**data, "DeliveryId": 0})
+    return integrations.shape(ep, {"event": "test", "delivery_id": 0, "schema_version": integrations.SCHEMA_VERSION,
+                                   "occurred_at": utcnow().isoformat() + "Z", "warehouse": None, "data": data,
+                                   "callbacks": {"confirm_tasks": "…/api/automation/confirmations"}})
 
 
 # ------------------------------------------------------------------ message log

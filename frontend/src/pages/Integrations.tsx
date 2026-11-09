@@ -79,30 +79,36 @@ function EndpointEditor({ ep, onClose, onSaved }: { ep: Partial<Endpoint>; onClo
     auth_value: "", signing_secret: "", clear_signing_secret: false,
     extra_headers: Object.keys(ep.extra_headers ?? {}).length ? JSON.stringify(ep.extra_headers, null, 2) : "",
     timeout_seconds: String(ep.timeout_seconds ?? 10), max_attempts: String(ep.max_attempts ?? 8),
-    assign_tasks: ep.assign_tasks ?? true, active: ep.active ?? true,
+    assign_tasks: ep.assign_tasks ?? true, active: ep.active ?? true, payload_format: ep.payload_format ?? "STANDARD",
+    field_names: Object.keys(ep.field_names ?? {}).length ? JSON.stringify(ep.field_names, null, 2) : "",
+    static_fields: Object.keys(ep.static_fields ?? {}).length ? JSON.stringify(ep.static_fields, null, 2) : "",
   });
+  const [preview, setPreview] = useState<string | null>(null);
   const [del, setDel] = useState(false);
   const zones = useLoad(() => (f.warehouse_id ? api.get<Zone[]>("/zones", { warehouse_id: f.warehouse_id }) : Promise.resolve([])), [f.warehouse_id]);
-  let headersOk = true;
-  try { if (f.extra_headers.trim()) JSON.parse(f.extra_headers); } catch { headersOk = false; }
+  const jsonOk = (txt: string) => { try { if (txt.trim()) { const v = JSON.parse(txt); return typeof v === "object" && !Array.isArray(v) && v !== null; } return true; } catch { return false; } };
+  const headersOk = jsonOk(f.extra_headers), namesOk = jsonOk(f.field_names), staticsOk = jsonOk(f.static_fields);
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const genSecret = () => {
     const bytes = crypto.getRandomValues(new Uint8Array(24));
     setF({ ...f, signing_secret: "whsec_" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""), clear_signing_secret: false });
   };
-  const save = async () => {
-    const body = {
+  const buildBody = () => ({
       name: f.name, url: f.url, warehouse_id: f.warehouse_id ? Number(f.warehouse_id) : null, events: f.events,
       zone_ids: f.warehouse_id ? f.zone_ids : [], auth_type: f.auth_type, auth_header: f.auth_header || null,
       auth_value: f.auth_value || null, signing_secret: f.signing_secret || null, clear_signing_secret: f.clear_signing_secret,
       extra_headers: f.extra_headers.trim() ? JSON.parse(f.extra_headers) : {}, timeout_seconds: Number(f.timeout_seconds),
       max_attempts: Number(f.max_attempts), assign_tasks: f.assign_tasks, active: f.active,
-    };
+      payload_format: f.payload_format, field_names: f.field_names.trim() ? JSON.parse(f.field_names) : {},
+      static_fields: f.static_fields.trim() ? JSON.parse(f.static_fields) : {},
+  });
+  const save = async () => {
+    const body = buildBody();
     const r = await run(() => (ep.id ? api.put(`/automation/endpoints/${ep.id}`, body) : api.post("/automation/endpoints", body)), "Endpoint saved");
     if (r) { onSaved(); onClose(); }
   };
   const needsSecret = f.auth_type !== "NONE" && !ep.auth_value_hint;
-  const valid = f.name && /^https?:\/\/.+/.test(f.url) && headersOk && (!needsSecret || f.auth_value) && f.events.length > 0;
+  const valid = f.name && /^https?:\/\/.+/.test(f.url) && headersOk && namesOk && staticsOk && (!needsSecret || f.auth_value) && f.events.length > 0;
   return (
     <Modal wide title={ep.id ? `Edit endpoint ${ep.name}` : "New outbound endpoint"} onClose={onClose} footer={<>
       {ep.id && <button className="btn btn-danger" style={{ marginRight: "auto" }} onClick={() => setDel(true)}>Delete</button>}
@@ -115,6 +121,12 @@ function EndpointEditor({ ep, onClose, onSaved }: { ep: Partial<Endpoint>; onClo
         <Field label="URL *" span={2} hint="The WMS POSTs JSON here. Use https:// outside your local network."><Input className="input mono" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} /></Field>
 
         <div className="form-section">What to send</div>
+        <Field label="Message format" span={2} hint={f.payload_format === "ORDER"
+          ? "One flat message per order: OrderNumber, Category, Customer, ShipTo, Lines[] (Sku, Quantity, UnitType, dimensions, Tasks[]). Test sends a sample order (IsTest = true)."
+          : "One message per event, fields nested under \"data\" (see docs/SOFTBOT_INTEGRATION.md)."}>
+          <Select value={f.payload_format} onChange={(e) => setF({ ...f, payload_format: e.target.value as Endpoint["payload_format"] })} options={[
+            { value: "STANDARD", label: "Standard event (snake_case, per event)" }, { value: "ORDER", label: "Per order (PascalCase: Lines, UnitType, Category…)" }]} />
+        </Field>
         <Field group label="Events *" span={2}>
           <div style={{ display: "grid", gap: 6 }}>
             {(events.data ?? []).map((ev) => (
@@ -133,6 +145,19 @@ function EndpointEditor({ ep, onClose, onSaved }: { ep: Partial<Endpoint>; onClo
               <label key={z.id} className="check"><input type="checkbox" checked={f.zone_ids.includes(z.id)} onChange={() => setF({ ...f, zone_ids: toggle(f.zone_ids, z.id) })} /> {z.code} <span className="muted">{z.name}</span></label>
             ))}
           </div>
+        </Field>
+
+        <Field label="Rename fields (JSON)" hint={namesOk ? 'Renames keys at any depth, e.g. {"Lines": "OrderLines", "Sku": "ItemCode"}' : "Must be a JSON object"}>
+          <textarea className="input mono" rows={3} value={f.field_names} onChange={(e) => setF({ ...f, field_names: e.target.value })} style={!namesOk ? { borderColor: "var(--bad)" } : undefined} />
+        </Field>
+        <Field label="Always include (JSON)" hint={staticsOk ? 'Added to every message, e.g. {"SendToPaccurate": true}' : "Must be a JSON object"}>
+          <textarea className="input mono" rows={3} value={f.static_fields} onChange={(e) => setF({ ...f, static_fields: e.target.value })} style={!staticsOk ? { borderColor: "var(--bad)" } : undefined} />
+        </Field>
+        <Field group label="" span={2}>
+          <div><button type="button" className="btn" disabled={busy || !namesOk || !staticsOk} onClick={async () => {
+            const r = await run(() => api.post<unknown>("/automation/endpoints/preview", { ...buildBody(), name: f.name || "preview", url: /^https?:\/\/.+/.test(f.url) ? f.url : "http://preview" }));
+            if (r) setPreview(JSON.stringify(r, null, 2));
+          }}>Preview message</button> <span className="muted" style={{ fontSize: 12 }}>Shows the test message exactly as it will be sent with these settings</span></div>
         </Field>
 
         <div className="form-section">Security</div>
@@ -162,6 +187,13 @@ function EndpointEditor({ ep, onClose, onSaved }: { ep: Partial<Endpoint>; onClo
           <textarea className="input mono" rows={3} value={f.extra_headers} onChange={(e) => setF({ ...f, extra_headers: e.target.value })} style={!headersOk ? { borderColor: "var(--bad)" } : undefined} />
         </Field>
       </div>
+      {preview && (
+        <Modal wide title="Message preview" onClose={() => setPreview(null)} footer={<>
+          <button className="btn" onClick={() => navigator.clipboard?.writeText(preview)}>Copy</button>
+          <button className="btn btn-primary" onClick={() => setPreview(null)}>Close</button></>}>
+          <pre className="code" style={{ maxHeight: "60vh" }}>{preview}</pre>
+        </Modal>
+      )}
       {del && <Confirm danger busy={busy} text="Delete this endpoint and its message history? Tasks already sent keep their assignment." onClose={() => setDel(false)}
         onYes={async () => { const r = await run(() => api.del(`/automation/endpoints/${ep.id}`), "Endpoint deleted"); setDel(false); if (r !== undefined) { onSaved(); onClose(); } }} />}
     </Modal>

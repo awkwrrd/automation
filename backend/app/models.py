@@ -156,6 +156,16 @@ class AuthType(StrEnum):
     HEADER = "HEADER"   # <auth_header>: <value>, e.g. X-API-Key
 
 
+class PayloadFormat(StrEnum):
+    STANDARD = "STANDARD"  # one message per event, snake_case, nested under "data"
+    ORDER = "ORDER"        # one flat PascalCase message per order (Lines[], UnitType, Category ...)
+
+
+# Suggested values (free text is allowed; receivers usually compare case-insensitively)
+UNIT_TYPES = ["EACH", "LINEAR", "AREA", "VOLUME", "WEIGHT", "CASE", "PALLET"]
+ORDER_CATEGORIES = ["STANDARD", "CONSOLIDATION", "EXPEDITED", "WHOLESALE", "REPLACEMENT", "SAMPLE"]
+
+
 class CountStatus(StrEnum):
     OPEN = "OPEN"
     COMPLETED = "COMPLETED"
@@ -258,6 +268,8 @@ class Item(Base):
     brand: Mapped[str | None] = mapped_column(String(128))
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"))
     uom: Mapped[str] = mapped_column(String(16), default="EA")
+    # how the item is measured/handled downstream, e.g. EACH or LINEAR (sold by length)
+    unit_type: Mapped[str | None] = mapped_column(String(24), default="EACH")
     unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
@@ -392,6 +404,7 @@ class OutboundOrder(Base):
     number: Mapped[str] = mapped_column(String(32), unique=True)
     external_id: Mapped[str | None] = mapped_column(String(64), index=True)  # e.g. Shopify order id
     channel: Mapped[str] = mapped_column(String(32), default="MANUAL")
+    category: Mapped[str | None] = mapped_column(String(32), default="STANDARD")  # e.g. CONSOLIDATION
     status: Mapped[str] = mapped_column(String(ENUM_LEN), default=OrderStatus.NEW, index=True)
     priority: Mapped[int] = mapped_column(Integer, default=5)  # 1 = highest
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"))
@@ -564,6 +577,10 @@ class IntegrationEndpoint(Base):
     assign_tasks: Mapped[bool] = mapped_column(Boolean, default=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # message shape (nullable so existing databases upgrade in place; None = STANDARD)
+    payload_format: Mapped[str | None] = mapped_column(String(16), default=PayloadFormat.STANDARD)
+    field_names: Mapped[str | None] = mapped_column(Text)    # JSON {"OldKey": "NewKey"} renames, any depth
+    static_fields: Mapped[str | None] = mapped_column(Text)  # JSON object merged into every message
 
     @property
     def event_list(self) -> list[str]:

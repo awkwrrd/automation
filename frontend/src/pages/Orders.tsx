@@ -43,6 +43,7 @@ export default function Orders() {
           selected={can("SUPERVISOR") ? sel : undefined} onSelect={can("SUPERVISOR") ? setSel : undefined} columns={[
           { key: "number", header: "Order #", render: (o) => <b>{o.number}</b> },
           { key: "ext", header: "Channel ref", render: (o) => (o.external_id ? <span>{o.external_id} <span className="muted">· {o.channel.toLowerCase()}</span></span> : <span className="muted">{o.channel.toLowerCase()}</span>) },
+          { key: "cat", header: "Category", render: (o) => (o.category && o.category !== "STANDARD" ? <Pill raw value={o.category} tone="info" /> : <span className="muted">standard</span>) },
           { key: "cust", header: "Customer", render: (o) => o.customer_name ?? "—" },
           { key: "dest", header: "Ship to", render: (o) => [o.ship_city, o.ship_state].filter(Boolean).join(", ") || "—" },
           { key: "pri", header: "Pri", align: "center", render: (o) => o.priority },
