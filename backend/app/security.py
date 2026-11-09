@@ -52,3 +52,13 @@ def decode_token(token: str) -> str | None:
         return data["sub"]
     except Exception:
         return None
+
+
+def new_api_key() -> tuple[str, str, str]:
+    """Returns (plaintext key - shown once, display prefix, sha256 hash to store)."""
+    key = "wms_" + secrets.token_urlsafe(32)
+    return key, key[:12], hash_api_key(key)
+
+
+def hash_api_key(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()

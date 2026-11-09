@@ -7,20 +7,25 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .db import Base, SessionLocal, engine
+from .db import Base, SessionLocal, add_missing_columns, engine
 from .errors import WMSError
-from .routers import auth, config_routes, counts, dashboard, inbound, inventory, items, outbound, tasks
+from .routers import auth, automation, config_routes, counts, dashboard, inbound, inventory, items, outbound, tasks
 from .seed import seed
+from .services.dispatcher import dispatcher
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # Creates any missing tables. For production schema changes, add Alembic migrations.
     Base.metadata.create_all(engine)
+    add_missing_columns(engine)  # upgrades existing databases with new nullable columns
     with SessionLocal() as db:
         seed(db)
         db.commit()
+    if settings.dispatcher_enabled:
+        dispatcher.start()
     yield
+    dispatcher.stop()
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan,
@@ -34,7 +39,7 @@ async def wms_error_handler(_: Request, exc: WMSError):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
-for r in (auth, config_routes, items, inventory, inbound, outbound, tasks, counts, dashboard):
+for r in (auth, automation, config_routes, items, inventory, inbound, outbound, tasks, counts, dashboard):
     app.include_router(r.router, prefix="/api")
 
 

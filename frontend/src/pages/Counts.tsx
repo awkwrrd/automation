@@ -73,7 +73,7 @@ function NewCount({ onClose }: { onClose: () => void }) {
             <LocationPicker value={null} onChange={(l) => l && !locs.some((x) => x.id === l.id) && setLocs([...locs, l])} />
           </Field>
         )}
-        <Field label="" span={2}><label className="check"><input type="checkbox" checked={blind} onChange={(e) => setBlind(e.target.checked)} /> Blind count (operators don't see expected quantities)</label></Field>
+        <Field group label="" span={2}><label className="check"><input type="checkbox" checked={blind} onChange={(e) => setBlind(e.target.checked)} /> Blind count (operators don't see expected quantities)</label></Field>
       </div>
     </Modal>
   );

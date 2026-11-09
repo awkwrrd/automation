@@ -82,7 +82,7 @@ export interface Task {
   id: number; task_type: string; status: string; priority: number; warehouse_id: number; item: ItemRef;
   lot_number: string; qty: number; qty_done: number; from_location: Ref | null; to_location: Ref | null;
   order_id: number | null; wave_id: number | null; reference_number: string | null; assigned_to: string | null;
-  created_at: string; completed_at: string | null; completed_by: string | null;
+  created_at: string; completed_at: string | null; completed_by: string | null; dispatch_endpoint_id: number | null;
 }
 
 export interface CountLine {
@@ -93,4 +93,20 @@ export interface Count {
   id: number; number: string; warehouse_id: number; status: string; description: string | null; blind: boolean;
   created_by: string | null; created_at: string; completed_at: string | null; line_count: number;
   counted_lines: number; lines?: CountLine[];
+}
+
+export interface Endpoint {
+  id: number; name: string; url: string; warehouse_id: number | null; events: string[]; zone_ids: number[];
+  auth_type: "NONE" | "BEARER" | "BASIC" | "HEADER"; auth_header: string | null; auth_value_hint: string | null;
+  has_signing_secret: boolean; extra_headers: Record<string, string>; timeout_seconds: number; max_attempts: number;
+  assign_tasks: boolean; active: boolean; created_at: string; pending: number; failed: number; last_sent_at: string | null;
+}
+export interface OutMessage {
+  id: number; endpoint_id: number; endpoint_name: string; event: string; reference: string | null; status: string;
+  attempts: number; next_attempt_at: string | null; last_attempt_at: string | null; sent_at: string | null;
+  response_code: number | null; last_error: string | null; created_at: string; payload?: string; response_body?: string | null;
+}
+export interface ApiKey {
+  id: number; name: string; user_id: number; username: string; prefix: string; active: boolean;
+  created_at: string; last_used_at: string | null; key?: string;
 }

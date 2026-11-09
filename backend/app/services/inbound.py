@@ -17,7 +17,7 @@ from ..models import (
     TxnType,
     utcnow,
 )
-from . import inventory
+from . import integrations, inventory
 from .common import first_location_of_type, get_or_404
 
 STORAGE_TYPES = (LocationType.BIN, LocationType.SHELF, LocationType.PALLET, LocationType.FLOOR)
@@ -106,6 +106,8 @@ def receive(db: Session, order: InboundOrder, line_id: int, qty: int, username: 
             inbound_line_id=line.id, reference_number=order.number,
         )
         db.add(task)
+        db.flush()
+        integrations.putaway_created(db, order, task)
     db.flush()
     return task
 

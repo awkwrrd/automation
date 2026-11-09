@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from ..errors import WMSError
 from ..models import Location, Task, TaskStatus, TaskType, TxnType, utcnow
-from . import inventory, outbound
+from . import integrations, inventory, outbound
 
 
 def complete(db: Session, task: Task, qty: int | None, username: str, to_location_id: int | None = None) -> None:
@@ -47,7 +47,8 @@ def cancel(db: Session, task: Task, username: str) -> None:
         # cancelling a pick == confirming zero picked: releases the reservation
         outbound.complete_pick(db, task, 0, username)
         task.status = TaskStatus.CANCELLED
-        return
-    task.status = TaskStatus.CANCELLED
-    task.completed_at = utcnow()
-    task.completed_by = username
+    else:
+        task.status = TaskStatus.CANCELLED
+        task.completed_at = utcnow()
+        task.completed_by = username
+    integrations.emit_tasks_cancelled(db, [task], f"Task {task.id} cancelled by {username}")

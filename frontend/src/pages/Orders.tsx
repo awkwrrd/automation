@@ -82,7 +82,7 @@ function CreateWave({ orderIds, onClose, onDone }: { orderIds: number[]; onClose
     </>}>
       <div className="form-grid">
         <Field label="Description" span={2}><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Morning ground orders" /></Field>
-        <Field label="" span={2}><label className="check"><input type="checkbox" checked={release} onChange={(e) => setRelease(e.target.checked)} /> Allocate & release immediately (creates pick tasks)</label></Field>
+        <Field group label="" span={2}><label className="check"><input type="checkbox" checked={release} onChange={(e) => setRelease(e.target.checked)} /> Allocate & release immediately (creates pick tasks)</label></Field>
       </div>
     </Modal>
   );

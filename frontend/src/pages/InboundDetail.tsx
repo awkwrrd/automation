@@ -86,7 +86,7 @@ function ReceiveModal({ inbound, line, onClose, onDone }: { inbound: Inbound; li
         <Field label="Receive to location" hint="Blank = default dock door"><LocationPicker value={loc} onChange={setLoc} placeholder="Default dock" /></Field>
         <Field label="Lot number"><Input value={lot} onChange={(e) => setLot(e.target.value)} placeholder="(required if lot-tracked)" /></Field>
         <Field label="Expiration date"><Input type="date" value={exp} onChange={(e) => setExp(e.target.value)} /></Field>
-        <Field label="Putaway" span={2}><label className="check"><input type="checkbox" checked={putaway} onChange={(e) => setPutaway(e.target.checked)} /> Create directed putaway task (when receiving to a dock location)</label></Field>
+        <Field group label="Putaway" span={2}><label className="check"><input type="checkbox" checked={putaway} onChange={(e) => setPutaway(e.target.checked)} /> Create directed putaway task (when receiving to a dock location)</label></Field>
       </div>
     </Modal>
   );

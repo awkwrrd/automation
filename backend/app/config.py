@@ -35,6 +35,11 @@ class Settings:
             o.strip() for o in os.getenv("WMS_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()
         ]
         self.app_name: str = os.getenv("WMS_APP_NAME", "Dockyard WMS")
+        # Base URL external systems use to call back into this WMS (included in outbound payloads)
+        self.public_url: str = os.getenv("WMS_PUBLIC_URL", "http://localhost:8000").rstrip("/")
+        # Background delivery of outbound integration messages
+        self.dispatcher_enabled: bool = _bool("WMS_DISPATCHER_ENABLED", "true")
+        self.dispatch_interval: float = float(os.getenv("WMS_DISPATCH_INTERVAL_SECONDS", "2"))
 
 
 settings = Settings()

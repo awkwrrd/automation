@@ -23,6 +23,8 @@ import Locations from "./pages/Locations";
 import Warehouses from "./pages/Warehouses";
 import Suppliers from "./pages/Suppliers";
 import Users from "./pages/Users";
+import Integrations from "./pages/Integrations";
+import MessageLog from "./pages/MessageLog";
 
 export default function App() {
   const { user, ready } = useApp();
@@ -52,6 +54,8 @@ export default function App() {
         <Route path="config/warehouses" element={<Warehouses />} />
         <Route path="config/suppliers" element={<Suppliers />} />
         <Route path="config/users" element={<Users />} />
+        <Route path="config/integrations" element={<Integrations />} />
+        <Route path="config/messages" element={<MessageLog />} />
         <Route path="*" element={<div className="empty">Page not found</div>} />
       </Route>
     </Routes>

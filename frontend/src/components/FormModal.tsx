@@ -35,7 +35,7 @@ export function FormModal<T extends Record<string, unknown>>({ title, fields, in
     </>}>
       <form className="form-grid" onSubmit={(e) => { e.preventDefault(); if (!missing) submit(); }}>
         {fields.map((f) => (
-          <Field key={f.key} label={`${f.label}${f.required ? " *" : ""}`} span={f.span} hint={f.hint}>
+          <Field group={f.type === "checkbox"} key={f.key} label={`${f.label}${f.required ? " *" : ""}`} span={f.span} hint={f.hint}>
             {f.type === "checkbox" ? (
               <label className="check"><input type="checkbox" checked={!!v[f.key]} onChange={(e) => setV({ ...v, [f.key]: e.target.checked })} /> Yes</label>
             ) : f.type === "select" ? (

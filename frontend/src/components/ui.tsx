@@ -116,11 +116,12 @@ const STATUS_TONE: Record<string, string> = {
   NEW: "info", OPEN: "info", PLANNED: "info", AVAILABLE: "ok",
   PARTIALLY_ALLOCATED: "warn", RECEIVING: "warn", IN_PROGRESS: "warn", PICKING: "warn", HOLD: "warn",
   ALLOCATED: "accent", RELEASED: "accent", PICKED: "accent", PACKED: "accent",
+  SENT: "ok", FAILED: "bad", PENDING: "warn",
   SHIPPED: "ok", RECEIVED: "ok", COMPLETE: "ok", COMPLETED: "ok", CLOSED: "muted",
   CANCELLED: "muted", DAMAGED: "bad", QUARANTINE: "bad",
 };
-export function Pill({ value, tone }: { value: string; tone?: string }) {
-  return <span className={`pill pill-${tone ?? STATUS_TONE[value] ?? "muted"}`}>{label(value)}</span>;
+export function Pill({ value, tone, raw }: { value: string; tone?: string; raw?: boolean }) {
+  return <span className={`pill pill-${tone ?? STATUS_TONE[value] ?? "muted"}`}>{raw ? value : label(value)}</span>;
 }
 
 export function Empty({ children }: { children: ReactNode }) {
@@ -237,13 +238,15 @@ export function Modal({ title, onClose, children, footer, wide }: { title: React
 }
 
 // ------------------------------------------------------------------ form fields
-export function Field({ label: l, children, hint, span }: { label: ReactNode; children: ReactNode; hint?: ReactNode; span?: number }) {
+/** `group` renders a <div> instead of <label>, for fields holding several inputs/buttons (avoids nested labels). */
+export function Field({ label: l, children, hint, span, group }: { label: ReactNode; children: ReactNode; hint?: ReactNode; span?: number; group?: boolean }) {
+  const Tag = group ? "div" : "label";
   return (
-    <label className="field" style={span ? { gridColumn: `span ${span}` } : undefined}>
+    <Tag className="field" style={span ? { gridColumn: `span ${span}` } : undefined}>
       <span className="field-label">{l}</span>
       {children}
       {hint && <span className="field-hint">{hint}</span>}
-    </label>
+    </Tag>
   );
 }
 

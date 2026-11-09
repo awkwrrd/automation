@@ -224,3 +224,6 @@ textarea.input { height: auto; padding: 8px 10px; min-height: 70px; resize: vert
 .station { max-width: 980px; }
 .scan-input { height: 46px; font-size: 18px; font-family: var(--mono); }
 .big-check { font-size: 13px; }
+
+pre.code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font: 12px/1.5 var(--mono); max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 6px 0 14px; }
+code { font-family: var(--mono); font-size: .92em; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }

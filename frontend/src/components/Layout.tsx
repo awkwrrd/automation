@@ -18,6 +18,8 @@ const I = {
   loc: "M10 1a6 6 0 016 6c0 4.5-6 11-6 11S4 11.5 4 7a6 6 0 016-6zm0 3.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z",
   wh: "M10 2l8 4v12h-3v-8H5v8H2V6zm-3 10h6v2H7zm0 3h6v2H7z",
   truck: "M1 4h11v9H1zm11 3h4l3 3v3h-7zM5 14a2 2 0 110 4 2 2 0 010-4zm10 0a2 2 0 110 4 2 2 0 010-4z",
+  plug: "M7 2h2v4h2V2h2v4h1a1 1 0 011 1v3a5 5 0 01-4 4.9V18H9v-3.1A5 5 0 015 10V7a1 1 0 011-1h1z",
+  msg: "M2 4h16v10H6l-4 4zm3 3v2h10V7zm0 3v2h7v-2z",
   users: "M7 9a3 3 0 110-6 3 3 0 010 6zm7 0a2.5 2.5 0 110-5 2.5 2.5 0 010 5zM1 16c0-3 3-5 6-5s6 2 6 5v1H1zm13-4c2.5 0 5 1.3 5 4v1h-4v-1c0-1.6-.4-2.8-1-4z",
 };
 const Icon = ({ d }: { d: string }) => <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden><path d={d} fill="currentColor" /></svg>;
@@ -44,6 +46,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
     { to: "/config/warehouses", label: "Warehouses & Zones", icon: I.wh },
     { to: "/config/suppliers", label: "Suppliers", icon: I.truck },
     { to: "/config/users", label: "Users", icon: I.users, role: "SUPERVISOR" },
+    { to: "/config/integrations", label: "Integrations", icon: I.plug, role: "SUPERVISOR" },
+    { to: "/config/messages", label: "Message Log", icon: I.msg, role: "SUPERVISOR" },
   ] },
 ];
 

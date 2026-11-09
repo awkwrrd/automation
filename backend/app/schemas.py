@@ -5,6 +5,8 @@ from typing import Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from .models import (
+    AuthType,
+    IntegrationEvent,
     InboundType,
     InventoryStatus,
     LocationType,
@@ -457,6 +459,7 @@ class TaskOut(ORM):
     created_at: datetime
     completed_at: datetime | None
     completed_by: str | None
+    dispatch_endpoint_id: int | None = None
 
 
 class TaskCompleteIn(BaseModel):
@@ -524,3 +527,105 @@ class CountSummary(ORM):
 
 class CountOut(CountSummary):
     lines: list[CountLineOut]
+
+
+# ------------------------------------------------------------------ integrations
+class EndpointIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    url: str = Field(pattern=r"^https?://", max_length=1024)
+    warehouse_id: int | None = None
+    events: list[IntegrationEvent] = Field(default_factory=list)
+    zone_ids: list[int] = Field(default_factory=list)
+    auth_type: AuthType = AuthType.NONE
+    auth_header: str | None = None
+    auth_value: str | None = Field(None, description="Omit or null on update to keep the stored secret")
+    signing_secret: str | None = Field(None, description="Omit or null on update to keep the stored secret")
+    clear_signing_secret: bool = False
+    extra_headers: dict[str, str] = Field(default_factory=dict)
+    timeout_seconds: int = Field(10, ge=1, le=120)
+    max_attempts: int = Field(8, ge=1, le=50)
+    assign_tasks: bool = True
+    active: bool = True
+
+
+class EndpointOut(BaseModel):
+    id: int
+    name: str
+    url: str
+    warehouse_id: int | None
+    events: list[str]
+    zone_ids: list[int]
+    auth_type: str
+    auth_header: str | None
+    auth_value_hint: str | None
+    has_signing_secret: bool
+    extra_headers: dict[str, str]
+    timeout_seconds: int
+    max_attempts: int
+    assign_tasks: bool
+    active: bool
+    created_at: datetime
+    pending: int = 0
+    failed: int = 0
+    last_sent_at: datetime | None = None
+
+
+class MessageOut(ORM):
+    id: int
+    endpoint_id: int
+    endpoint_name: str = ""
+    event: str
+    reference: str | None
+    status: str
+    attempts: int
+    next_attempt_at: datetime | None
+    last_attempt_at: datetime | None
+    sent_at: datetime | None
+    response_code: int | None
+    last_error: str | None
+    created_at: datetime
+
+
+class MessageDetail(MessageOut):
+    payload: str
+    response_body: str | None
+
+
+class ApiKeyIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    user_id: int
+
+
+class ApiKeyOut(ORM):
+    id: int
+    name: str
+    user_id: int
+    username: str = ""
+    prefix: str
+    active: bool
+    created_at: datetime
+    last_used_at: datetime | None
+
+
+class ApiKeyCreated(ApiKeyOut):
+    key: str
+
+
+class ConfirmationIn(BaseModel):
+    task_id: int
+    qty: int | None = Field(None, description="Quantity done; omit for the full remaining qty. Less than remaining on a pick = short pick")
+    to_location_code: str | None = None
+    to_location_id: int | None = None
+    notes: str | None = None
+
+
+class ConfirmationsIn(BaseModel):
+    confirmations: list[ConfirmationIn] = Field(min_length=1, max_length=500)
+
+
+class ConfirmationResult(BaseModel):
+    task_id: int
+    ok: bool
+    status: str | None = None
+    qty_done: int | None = None
+    error: str | None = None

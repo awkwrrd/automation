@@ -84,8 +84,8 @@ export default function ItemDetail() {
           <Field label="Home / putaway location" hint="Directed putaway sends receipts here first">
             {editable ? <LocationPicker value={form.default_location ?? null} onChange={(l) => setForm((f) => ({ ...f, default_location: l, default_location_id: l?.id ?? null }))} /> : <Input disabled value={form.default_location?.code ?? ""} />}
           </Field>
-          <Field label="Tracking"><label className="check"><input type="checkbox" disabled={!editable} checked={!!form.lot_tracked} onChange={(e) => set("lot_tracked", e.target.checked)} /> Lot / expiry tracked</label></Field>
-          <Field label="Status"><label className="check"><input type="checkbox" disabled={!editable} checked={!!form.active} onChange={(e) => set("active", e.target.checked)} /> Active</label></Field>
+          <Field group label="Tracking"><label className="check"><input type="checkbox" disabled={!editable} checked={!!form.lot_tracked} onChange={(e) => set("lot_tracked", e.target.checked)} /> Lot / expiry tracked</label></Field>
+          <Field group label="Status"><label className="check"><input type="checkbox" disabled={!editable} checked={!!form.active} onChange={(e) => set("active", e.target.checked)} /> Active</label></Field>
           <Field label="Image URL">{txt("image_url")}</Field>
           <div className="form-section">Shopify mapping</div>
           <Field label="Product ID">{txt("shopify_product_id")}</Field>

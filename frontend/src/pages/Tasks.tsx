@@ -45,7 +45,7 @@ export default function Tasks() {
           { key: "qty", header: "Qty", align: "right", render: (t) => (t.qty_done ? `${t.qty_done}/${t.qty}` : t.qty) },
           { key: "ref", header: "Reference", render: (t) => (t.order_id ? <Link to={`/orders/${t.order_id}`}>{t.reference_number}</Link> : t.reference_number ?? "") },
           { key: "pri", header: "Pri", align: "center", render: (t) => t.priority },
-          { key: "asg", header: "Assigned", render: (t) => t.completed_by ?? t.assigned_to ?? <span className="muted">—</span> },
+          { key: "asg", header: "Assigned", render: (t) => t.dispatch_endpoint_id && !t.completed_by ? <Pill raw value={`→ ${t.assigned_to}`} tone="accent" /> : t.completed_by ?? t.assigned_to ?? <span className="muted">—</span> },
           { key: "st", header: "Status", render: (t) => <Pill value={t.status} /> },
           { key: "c", header: "Created", render: (t) => <span className="muted">{fmtDateTime(t.created_at)}</span> },
           { key: "a", header: "", align: "right", render: (t) => ["OPEN", "IN_PROGRESS"].includes(t.status) && (
@@ -85,6 +85,9 @@ function ExecuteTask({ task, onClose, onDone }: { task: Task; onClose: () => voi
       <button className="btn" onClick={onClose}>Close</button>
       <button className="btn btn-primary" disabled={busy || !dest || !fromOk || Number(qty) < (isPick ? 0 : 1) || Number(qty) > remaining} onClick={submit}>Confirm</button>
     </>}>
+      {task.dispatch_endpoint_id && (
+        <div className="notice">This task was sent to <b>{task.assigned_to}</b>. Confirm it here only if you are overriding the automation (e.g. picked manually).</div>
+      )}
       <dl className="kv" style={{ marginBottom: 16 }}>
         <dt>Item</dt><dd><b>{task.item.sku}</b> — {task.item.name}</dd>
         {task.lot_number && <><dt>Lot</dt><dd>{task.lot_number}</dd></>}

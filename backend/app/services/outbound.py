@@ -24,7 +24,7 @@ from ..models import (
     WaveStatus,
     utcnow,
 )
-from . import inventory
+from . import integrations, inventory
 from .common import first_location_of_type, next_number
 
 CLOSED = (OrderStatus.SHIPPED, OrderStatus.CANCELLED)
@@ -287,8 +287,12 @@ def deallocate(db: Session, order: OutboundOrder, username: str) -> None:
     """Release every un-picked reservation and cancel open pick tasks."""
     if order.status in CLOSED or order.status == OrderStatus.PACKED:
         raise WMSError(f"Order {order.number} is {order.status}")
-    for task in _open_tasks(db, order):
+    cancelled = _open_tasks(db, order)
+    for task in cancelled:
         task.status = TaskStatus.CANCELLED
+        task.completed_at = utcnow()
+        task.completed_by = username
+    integrations.emit_tasks_cancelled(db, cancelled, f"Order {order.number} unallocated or cancelled")
     for line in order.lines:
         for alloc in line.allocations:
             if alloc.status == AllocationStatus.OPEN:
@@ -342,18 +346,20 @@ def create_wave(db: Session, warehouse_id: int, order_ids: list[int], descriptio
 def release_wave(db: Session, wave: Wave, username: str) -> dict:
     if wave.status != WaveStatus.PLANNED:
         raise WMSError(f"Wave is {wave.status}")
-    tasks = 0
+    tasks: list[Task] = []
     skipped: list[str] = []
     for order in wave.orders:
         if order.status in CLOSED:
             continue
         allocate(db, order, username)
         try:
-            tasks += len(release(db, order, wave))
+            tasks += release(db, order, wave)
         except WMSError:
             skipped.append(order.number)
     wave.status = WaveStatus.RELEASED
     wave.released_at = utcnow()
     db.flush()
+    if tasks:
+        integrations.wave_released(db, wave, tasks)
     _refresh_wave(db, wave.id)
-    return {"tasks_created": tasks, "orders_not_released": skipped}
+    return {"tasks_created": len(tasks), "orders_not_released": skipped}

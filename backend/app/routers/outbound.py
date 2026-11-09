@@ -7,6 +7,7 @@ from ..deps import current_user, require_role
 from ..errors import WMSError
 from ..models import (Item, OrderStatus, OutboundLine, OutboundOrder, Role, Task, TaskStatus, User, Wave)
 from ..schemas import (OrderIn, OrderOut, OrderSummary, PackIn, Page, ShipIn, ShipmentOut, WaveIn, WaveOut)
+from ..services import integrations
 from ..services import outbound as svc
 from ..services.common import get_or_404, next_number
 from ._util import like, paginate
@@ -84,7 +85,9 @@ def release(order_id: int, db: Session = Depends(get_db), user: User = Depends(c
     order = _act(order_id, db)
     if order.status in (OrderStatus.NEW, OrderStatus.PARTIALLY_ALLOCATED):
         svc.allocate(db, order, user.username)
-    svc.release(db, order)
+    tasks = svc.release(db, order)
+    if tasks:
+        integrations.order_released(db, order, tasks)
     return _summary(order)
 
 

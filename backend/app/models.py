@@ -134,6 +134,28 @@ class ShipmentStatus(StrEnum):
     SHIPPED = "SHIPPED"
 
 
+class IntegrationEvent(StrEnum):
+    WAVE_RELEASED = "wave.released"      # a wave was released: its pick tasks
+    ORDER_RELEASED = "order.released"    # a single order released outside a wave
+    PUTAWAY_CREATED = "putaway.created"  # receiving created a putaway task
+    TASK_CANCELLED = "task.cancelled"    # a task previously sent to the endpoint was cancelled
+    TEST = "test"                        # manual connectivity test from the GUI
+
+
+class MessageStatus(StrEnum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class AuthType(StrEnum):
+    NONE = "NONE"
+    BEARER = "BEARER"   # Authorization: Bearer <value>
+    BASIC = "BASIC"     # value = "user:password"
+    HEADER = "HEADER"   # <auth_header>: <value>, e.g. X-API-Key
+
+
 class CountStatus(StrEnum):
     OPEN = "OPEN"
     COMPLETED = "COMPLETED"
@@ -476,6 +498,8 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     completed_by: Mapped[str | None] = mapped_column(String(64))
+    # integration endpoint (e.g. a robotics platform) this task was dispatched to
+    dispatch_endpoint_id: Mapped[int | None] = mapped_column(Integer, index=True)
 
     item: Mapped[Item] = relationship()
     from_location: Mapped[Location | None] = relationship(foreign_keys=[from_location_id])
@@ -518,3 +542,70 @@ class CycleCountLine(Base):
     count: Mapped[CycleCount] = relationship(back_populates="lines")
     location: Mapped[Location] = relationship()
     item: Mapped[Item] = relationship()
+
+
+# --------------------------------------------------------------------------- integrations
+class IntegrationEndpoint(Base):
+    """An external system (robotics platform, WCS, ERP...) the WMS pushes events to."""
+    __tablename__ = "integration_endpoints"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    url: Mapped[str] = mapped_column(String(1024))
+    warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id"))  # None = all warehouses
+    events: Mapped[str] = mapped_column(Text, default="")       # comma-separated IntegrationEvent values
+    zone_ids: Mapped[str | None] = mapped_column(Text)           # comma-separated; None = all zones
+    auth_type: Mapped[str] = mapped_column(String(16), default=AuthType.NONE)
+    auth_header: Mapped[str | None] = mapped_column(String(64))
+    auth_value: Mapped[str | None] = mapped_column(Text)
+    signing_secret: Mapped[str | None] = mapped_column(String(128))
+    extra_headers: Mapped[str | None] = mapped_column(Text)      # JSON object
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=10)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=8)
+    assign_tasks: Mapped[bool] = mapped_column(Boolean, default=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    @property
+    def event_list(self) -> list[str]:
+        return [e for e in (self.events or "").split(",") if e]
+
+    @property
+    def zone_id_list(self) -> list[int]:
+        return [int(z) for z in (self.zone_ids or "").split(",") if z.strip()]
+
+
+class OutboundMessage(Base):
+    """Transactional outbox: written with the business change, delivered by the dispatcher."""
+    __tablename__ = "outbound_messages"
+    __table_args__ = (Index("ix_outbox_status_endpoint", "status", "endpoint_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    endpoint_id: Mapped[int] = mapped_column(ForeignKey("integration_endpoints.id"), index=True)
+    event: Mapped[str] = mapped_column(String(48))
+    reference: Mapped[str | None] = mapped_column(String(64), index=True)
+    payload: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(ENUM_LEN), default=MessageStatus.PENDING)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    response_code: Mapped[int | None] = mapped_column(Integer)
+    response_body: Mapped[str | None] = mapped_column(Text)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    endpoint: Mapped[IntegrationEndpoint] = relationship()
+
+
+class ApiKey(Base):
+    """Long-lived credential for system-to-system calls; acts as the linked user."""
+    __tablename__ = "api_keys"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    prefix: Mapped[str] = mapped_column(String(16))
+    key_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    user: Mapped[User] = relationship()

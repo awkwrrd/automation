@@ -53,6 +53,7 @@ export const api = {
   get: <T>(path: string, params?: Params) => request<T>("GET", path, undefined, params),
   post: <T>(path: string, body?: unknown, params?: Params) => request<T>("POST", path, body ?? {}, params),
   put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
+  del: <T>(path: string) => request<T>("DELETE", path),
   download: async (path: string, filename: string) => {
     const res = await fetch(`/api${path}`, { headers: { Authorization: `Bearer ${getToken()}` } });
     const blob = await res.blob();

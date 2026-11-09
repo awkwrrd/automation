@@ -95,7 +95,7 @@ function Generate({ zones, onClose, onDone }: { zones: Zone[]; onClose: () => vo
         <Field label="Zone"><Select value={f.zone_id} onChange={(e) => setF({ ...f, zone_id: e.target.value })} placeholder="—" options={zones.map((z) => ({ value: z.id, label: z.code }))} /></Field>
         <Field label="Type"><Select value={f.location_type} onChange={(e) => setF({ ...f, location_type: e.target.value })} options={meta?.location_types ?? []} /></Field>
         <Field label="Code pattern" span={2} hint={`Example: ${example}`}><Input className="input mono" value={f.pattern} onChange={(e) => setF({ ...f, pattern: e.target.value })} /></Field>
-        <Field label="" span={2}><label className="check"><input type="checkbox" checked={f.pickable} onChange={(e) => setF({ ...f, pickable: e.target.checked })} /> Pickable</label></Field>
+        <Field group label="" span={2}><label className="check"><input type="checkbox" checked={f.pickable} onChange={(e) => setF({ ...f, pickable: e.target.checked })} /> Pickable</label></Field>
       </div>
     </Modal>
   );

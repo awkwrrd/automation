@@ -1,7 +1,7 @@
 """Database engine/session. The WMS is database-agnostic via SQLAlchemy."""
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -43,3 +43,23 @@ def get_db() -> Iterator[Session]:
         raise
     finally:
         db.close()
+
+
+def add_missing_columns(eng: Engine) -> list[str]:
+    """Lightweight auto-migration: add new *nullable* columns to tables that already exist,
+    so upgrading the app doesn't require recreating the database. (Use Alembic for anything bigger.)"""
+    insp = inspect(eng)
+    prep = eng.dialect.identifier_preparer
+    added: list[str] = []
+    with eng.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            existing = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in existing or not col.nullable:
+                    continue
+                ddl_type = col.type.compile(dialect=eng.dialect)
+                conn.execute(text(f"ALTER TABLE {prep.format_table(table)} ADD COLUMN {prep.format_column(col)} {ddl_type}"))
+                added.append(f"{table.name}.{col.name}")
+    return added
