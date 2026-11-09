@@ -170,8 +170,12 @@ def test_bad_credentials_message(client, admin, fake):
     fake.reject_token = '{"error":"shop_not_permitted"}'
     ok(client.put("/api/shopify/store", headers=admin, json={**STORE, "client_secret": "rotated"}))
     run = ok(client.post("/api/shopify/test", headers=admin))
-    fake.reject_token = None
     assert run["status"] == "ERROR" and "same Shopify organization" in run["error"]
+    fake.reject_token = ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+                         '<title>400 - Oauth error app_not_installed</title></head><body>...</body></html>')
+    run = ok(client.post("/api/shopify/test", headers=admin))
+    fake.reject_token = None
+    assert "not installed on wms-dev.myshopify.com" in run["error"] and "<html" not in run["error"]
     assert ok(client.get("/api/shopify/store", headers=admin))["last_error"].startswith("TEST:")
 
 

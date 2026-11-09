@@ -27,10 +27,12 @@ Use the Dev Dashboard instead. Your **dev store and the app must be in the same 
    ```
    read_products,read_inventory,write_inventory,read_locations,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders
    ```
-   Other fields on that page: **App URL** isn't used by the WMS, so leave the placeholder (e.g.
-   `https://example.com`). **Untick** *Embed app in Shopify admin*. Leave *Allowed redirection URL(s)* empty
+   Other fields on that page: **App URL** isn't used by the WMS. Shopify's suggested default for apps without a page in the admin is
+   `https://shopify.dev/apps/default-app-home`, and any placeholder works. **Untick** *Embed app in Shopify admin*. Leave *Allowed redirection URL(s)* empty
    and *Use legacy install flow* unticked.
-3. **Release** the version, then **Install** the app on your dev store.
+3. **Release** the version. Then, on the app's page, click **Install app** (top of the *Installs* card),
+   choose your dev store, and click **Install**. Creating the app is not enough: without this step the
+   connection test fails with `app_not_installed`.
 4. Open the app's **Settings** and copy the **Client ID** and **Client secret**.
 
 > Already have a token from a legacy custom app created before 2026 (`shpat_…`)? Choose
@@ -80,7 +82,9 @@ Then use **Push all** once, and turn on the automatic push.
 ## 5. Troubleshooting
 
 - **Sync log** (bottom of the Shopify page): every run with counts. Click a row for its notes or error.
-- `shop_not_permitted`: the app and store aren't in the same organization, or the app isn't installed.
+- `app_not_installed`: the app was created but not installed on that store, or the store domain points at a
+  different store. Use *Install app* in the Dev Dashboard.
+- `shop_not_permitted`: the app and the store aren't in the same organization.
 - Fulfillment **FAILED** on an order: the reason shows on the order. Fix it in Shopify (e.g. order on hold),
   then click **Retry Shopify fulfillment** on the order.
 - Customer name/address blank on imported orders: request *protected customer data* access (name, email,

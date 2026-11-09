@@ -137,6 +137,32 @@ M_SET_INVENTORY = """mutation WmsSetInventory($input: InventorySetQuantitiesInpu
 }"""
 
 
+TOKEN_ERRORS = {
+    "app_not_installed": "The app is not installed on {shop}. In the Shopify Dev Dashboard open the app, release a "
+                         "version if you haven't, then click 'Install app' and choose this store. Also check the "
+                         "store domain here is that store's .myshopify.com address.",
+    "shop_not_permitted": "Shopify only allows this login method when the app and {shop} belong to the same Shopify "
+                          "organization. Create the app in the Dev Dashboard of the organization that owns the store.",
+    "invalid_client": "Shopify rejected the client ID or secret. Copy both again from the app's Settings page in the "
+                      "Dev Dashboard (the secret may have been rotated).",
+}
+
+
+def token_error_message(shop: str, status: int, text: str) -> str:
+    """Turn Shopify's token-endpoint error (often an HTML page) into a readable sentence."""
+    code = None
+    m = re.search(r"Oauth error (\w+)", text) or re.search(r'"error"\s*:\s*"(\w+)"', text)
+    if m:
+        code = m.group(1)
+    if code in TOKEN_ERRORS:
+        return f"{TOKEN_ERRORS[code].format(shop=shop)} (Shopify: {code})"
+    title = re.search(r"<title>(.*?)</title>", text, re.S)
+    detail = title.group(1).strip() if title else re.sub(r"\s+", " ", text)[:300]
+    if status == 404:
+        return f"No Shopify store found at {shop}. Check the store domain (your-store.myshopify.com)."
+    return f"Token request failed (HTTP {status}): {detail}"
+
+
 # ------------------------------------------------------------------ client
 class ShopifyClient:
     def __init__(self, db: Session, store: ShopifyStore, http: httpx.Client):
@@ -160,9 +186,7 @@ class ShopifyClient:
                            data={"grant_type": "client_credentials", "client_id": s.client_id,
                                  "client_secret": s.client_secret})
         if r.status_code != 200:
-            hint = (" The app and the store must be in the same Shopify organization, and the app must be "
-                    "installed on the store." if "shop_not_permitted" in r.text or r.status_code in (400, 401) else "")
-            raise ShopifyError(f"Token request failed (HTTP {r.status_code}): {r.text[:300]}.{hint}")
+            raise ShopifyError(token_error_message(s.shop_domain, r.status_code, r.text))
         body = r.json()
         s.access_token = body["access_token"]
         s.token_expires_at = utcnow() + timedelta(seconds=int(body.get("expires_in", 86399)))
