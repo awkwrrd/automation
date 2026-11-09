@@ -25,5 +25,14 @@ services:
       WMS_PUBLIC_URL: ${WMS_PUBLIC_URL:-http://localhost:8000}
     # lets the container reach services on the host PC as http://host.docker.internal:<port>
     extra_hosts: ["host.docker.internal:host-gateway"]
+  # Stand-in picking system (KFX / AutoStore) for proofs of concept: answers 200 to whatever the
+  # outbound SOFTBOT POSTs and lists the messages at http://localhost:9100
+  mock-picking:
+    image: python:3.13-slim
+    command: ["python", "-u", "/app/server.py", "--port", "9100"]
+    volumes: ["./tools/mock_picking:/app:ro"]
+    ports: ["9100:9100"]
+    restart: unless-stopped
+
 volumes:
   pgdata:

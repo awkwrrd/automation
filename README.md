@@ -70,6 +70,7 @@ WMS_DATABASE_URL=postgresql+psycopg://user:pass@localhost/wms_test pytest  # Pos
 | **Configuration** | Multi-warehouse, zones, locations (plus bulk generation such as aisles A–D × bays 1–10 × levels 1–4), suppliers, users |
 | **Integrations** | Push events (`wave.released`, `order.released`, `putaway.created`, `task.cancelled`) to external systems such as a robotics platform, routed by warehouse and zone, as standard events or one PascalCase message per order (field renames and fixed fields configurable). Signed (HMAC), ordered, retried, with a message log. API keys + a bulk task-confirmation API for the response leg. See [docs/SOFTBOT_INTEGRATION.md](docs/SOFTBOT_INTEGRATION.md) |
 | **Shopify** | Connect a store (Dev Dashboard app or existing token): import products and orders (polling, no public URL needed), cancel on Shopify cancellation, fulfillment + tracking on ship, push on-hand stock. See [docs/SHOPIFY.md](docs/SHOPIFY.md) |
+| **Mock picking system** | Stand-in for KFX / AutoStore during proofs of concept: answers 200 to the outbound SOFTBOT and shows each message at http://localhost:9100. See [docs/MOCK_PICKING.md](docs/MOCK_PICKING.md) |
 | **Security** | Token auth with three roles: **Operator** (floor execution), **Supervisor** (adjustments, order/wave/count control, item master), **Admin** (config & users) |
 
 ### Inventory model (important for Shopify sync)
