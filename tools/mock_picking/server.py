@@ -153,9 +153,20 @@ def make_handler(args):
             if args.delay:
                 time.sleep(args.delay)
             auth = describe_auth(self.headers)
-            if args.api_key and self.headers.get(args.api_key_header) != args.api_key:
-                status = 401
+            reject = None
+            if args.api_key:
+                got = self.headers.get(args.api_key_header)
+                if got is None:
+                    reject = (f"missing header '{args.api_key_header}' (headers received: "
+                              f"{', '.join(sorted(k for k in self.headers.keys() if not k.lower().startswith(('cf-', 'x-forwarded', 'cdn-'))))})")
+                elif got != args.api_key:
+                    hint = " (has surrounding spaces/quotes)" if got.strip().strip('"') == args.api_key else ""
+                    reject = (f"wrong key in '{args.api_key_header}': received {len(got)} chars "
+                              f"'{got[:3]}…{got[-2:] if len(got) > 4 else ''}', expected {len(args.api_key)} chars "
+                              f"'{args.api_key[:3]}…'{hint}")
             if args.basic and self.headers.get("Authorization") != "Basic " + base64.b64encode(args.basic.encode()).decode():
+                reject = "missing or wrong Basic credentials"
+            if reject:
                 status = 401
             try:
                 body = json.loads(raw) if raw else None
@@ -166,12 +177,14 @@ def make_handler(args):
                 SEQ[0] += 1
                 mid = SEQ[0]
                 MESSAGES.append({"id": mid, "received_at": now(), "method": self.command, "path": self.path,
-                                 "auth": auth, "status": status, "summary": summarize(body),
+                                 "auth": auth + (f" — REJECTED: {reject}" if reject else ""), "status": status,
+                                 "summary": summarize(body),
                                  "content_type": self.headers.get("Content-Type"), "body_pretty": pretty})
             print(f"[{now()}] #{mid} {self.command} {self.path} auth={auth} -> {status} {summarize(body)}", flush=True)
             if 200 <= status < 300:
                 return self._send(status, {"accepted": True, "id": mid, "received_at": now()})
-            return self._send(status, {"accepted": False, "id": mid, "error": f"simulated HTTP {status}"})
+            return self._send(status, {"accepted": False, "id": mid,
+                                       "error": f"unauthorized: {reject}" if reject else f"simulated HTTP {status}"})
 
         def _token(self, raw: bytes):
             form = {k: v[0] for k, v in parse_qs(raw.decode()).items()}
