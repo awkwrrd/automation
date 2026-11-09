@@ -67,7 +67,8 @@ export interface Order {
   id: number; number: string; external_id: string | null; channel: string; category: string | null; status: string; priority: number;
   warehouse_id: number; wave: { id: number; number: string } | null; customer_name: string | null;
   ship_city: string | null; ship_state: string | null; ship_method: string | null; requested_ship_date: string | null;
-  created_at: string; shipped_at: string | null; units: number; line_count: number;
+  created_at: string; shipped_at: string | null; units: number; line_count: number; shopify_fulfillment_status?: string | null;
+  shopify_order_id?: string | null; shopify_fulfillment_error?: string | null;
   customer_email?: string | null; customer_phone?: string | null; ship_name?: string | null;
   ship_address1?: string | null; ship_address2?: string | null; ship_postal_code?: string | null;
   ship_country?: string | null; notes?: string | null; lines?: OrderLine[]; shipments?: Shipment[];
@@ -110,4 +111,17 @@ export interface OutMessage {
 export interface ApiKey {
   id: number; name: string; user_id: number; username: string; prefix: string; active: boolean;
   created_at: string; last_used_at: string | null; key?: string;
+}
+
+export interface ShopifyStore {
+  id: number; shop_domain: string; auth_mode: "CLIENT_CREDENTIALS" | "ACCESS_TOKEN"; client_id: string | null;
+  has_client_secret: boolean; has_access_token: boolean; token_expires_at: string | null; granted_scopes: string[];
+  api_version: string; warehouse_id: number | null; shopify_location_id: string | null; active: boolean;
+  poll_minutes: number; import_orders: boolean; orders_since: string | null; orders_cursor: string | null;
+  import_test_orders: boolean; fulfill_on_ship: boolean; notify_customer: boolean; push_inventory: boolean;
+  last_sync_at: string | null; last_error: string | null; pending_fulfillments: number; failed_fulfillments: number;
+}
+export interface SyncRun {
+  id: number; kind: string; trigger: string; status: string; error: string | null; started_at: string;
+  finished_at: string | null; summary: (Record<string, unknown> & { messages?: string[] }) | null;
 }

@@ -263,6 +263,8 @@ def ship(db: Session, order: OutboundOrder, username: str, *, tracking_number: s
     shipment.shipped_at = utcnow()
     order.status = OrderStatus.SHIPPED
     order.shipped_at = shipment.shipped_at
+    if order.shopify_order_id:  # picked up by the Shopify connector, which creates the fulfillment
+        order.shopify_fulfillment_status = "PENDING"
     db.flush()
     return shipment
 

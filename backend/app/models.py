@@ -288,6 +288,7 @@ class Item(Base):
     shopify_product_id: Mapped[str | None] = mapped_column(String(64), index=True)
     shopify_variant_id: Mapped[str | None] = mapped_column(String(64), index=True)
     shopify_inventory_item_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    shopify_synced_qty: Mapped[int | None] = mapped_column(Integer)  # last on-hand pushed to Shopify
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -424,6 +425,11 @@ class OutboundOrder(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     shipped_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Shopify link (orders imported by the connector)
+    shopify_order_id: Mapped[str | None] = mapped_column(String(64), index=True)  # gid://shopify/Order/...
+    shopify_updated_at: Mapped[str | None] = mapped_column(String(40))
+    shopify_fulfillment_status: Mapped[str | None] = mapped_column(String(16))  # PENDING / DONE / FAILED
+    shopify_fulfillment_error: Mapped[str | None] = mapped_column(Text)
 
     warehouse: Mapped[Warehouse] = relationship()
     wave: Mapped[Wave | None] = relationship(back_populates="orders")
@@ -626,3 +632,51 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     user: Mapped[User] = relationship()
+
+
+# --------------------------------------------------------------------------- Shopify
+class ShopifyAuthMode(StrEnum):
+    CLIENT_CREDENTIALS = "CLIENT_CREDENTIALS"  # Dev Dashboard app: client id + secret -> 24h tokens
+    ACCESS_TOKEN = "ACCESS_TOKEN"              # existing legacy custom app token (shpat_...)
+
+
+class ShopifyStore(Base):
+    """Connection to one Shopify store. All columns nullable/defaulted so the table can evolve in place."""
+    __tablename__ = "shopify_stores"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_domain: Mapped[str] = mapped_column(String(255))           # your-store.myshopify.com
+    auth_mode: Mapped[str] = mapped_column(String(24), default=ShopifyAuthMode.CLIENT_CREDENTIALS)
+    client_id: Mapped[str | None] = mapped_column(String(255))
+    client_secret: Mapped[str | None] = mapped_column(Text)
+    access_token: Mapped[str | None] = mapped_column(Text)          # static token, or cached 24h token
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    granted_scopes: Mapped[str | None] = mapped_column(Text)
+    api_version: Mapped[str] = mapped_column(String(16), default="2026-10")
+    warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id"))
+    active: Mapped[bool] = mapped_column(Boolean, default=False)    # background sync on/off
+    poll_minutes: Mapped[int] = mapped_column(Integer, default=5)
+    import_orders: Mapped[bool] = mapped_column(Boolean, default=True)
+    orders_since: Mapped[datetime | None] = mapped_column(DateTime)  # only orders created after this
+    orders_cursor: Mapped[str | None] = mapped_column(String(40))   # last Shopify updatedAt processed
+    import_test_orders: Mapped[bool] = mapped_column(Boolean, default=True)
+    fulfill_on_ship: Mapped[bool] = mapped_column(Boolean, default=True)
+    notify_customer: Mapped[bool] = mapped_column(Boolean, default=True)
+    push_inventory: Mapped[bool] = mapped_column(Boolean, default=False)  # off until stock is reconciled
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    warehouse: Mapped[Warehouse | None] = relationship()
+
+
+class ShopifySyncRun(Base):
+    __tablename__ = "shopify_sync_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    store_id: Mapped[int] = mapped_column(ForeignKey("shopify_stores.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(24))      # PRODUCTS / ORDERS / FULFILLMENTS / INVENTORY / TEST
+    trigger: Mapped[str] = mapped_column(String(16))   # MANUAL / SCHEDULED
+    status: Mapped[str] = mapped_column(String(16), default="RUNNING")  # RUNNING / OK / ERROR
+    summary: Mapped[str | None] = mapped_column(Text)  # JSON counts + messages
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)

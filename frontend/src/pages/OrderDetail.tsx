@@ -92,6 +92,11 @@ export default function OrderDetail() {
                 {o.customer_email && <><dt>Email</dt><dd>{o.customer_email}</dd></>}
                 {o.customer_phone && <><dt>Phone</dt><dd>{o.customer_phone}</dd></>}
                 {o.notes && <><dt>Notes</dt><dd>{o.notes}</dd></>}
+                {o.shopify_order_id && <><dt>Shopify</dt><dd>
+                  {o.shopify_fulfillment_status ? <Pill value={o.shopify_fulfillment_status === "DONE" ? "FULFILLED" : o.shopify_fulfillment_status} tone={o.shopify_fulfillment_status === "DONE" ? "ok" : o.shopify_fulfillment_status === "FAILED" ? "bad" : "warn"} /> : <span className="muted">not shipped yet</span>}
+                  {o.shopify_fulfillment_error && <div className="qty-neg" style={{ fontSize: 12 }}>{o.shopify_fulfillment_error}</div>}
+                  {o.shopify_fulfillment_status === "FAILED" && sup && <div><button className="btn btn-sm" style={{ marginTop: 6 }} disabled={busy} onClick={async () => { await run(() => api.post(`/shopify/orders/${o.id}/retry-fulfillment`), "Fulfillment queued for retry"); reload(); }}>Retry Shopify fulfillment</button></div>}
+                </dd></>}
               </dl>
             </Card>
           </div>

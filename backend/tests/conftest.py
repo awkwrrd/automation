@@ -5,6 +5,7 @@ _tmp = tempfile.mkdtemp()
 os.environ.setdefault("WMS_DATABASE_URL", f"sqlite:///{_tmp}/test.db")
 os.environ["WMS_SEED_DEMO_DATA"] = "true"
 os.environ["WMS_DISPATCHER_ENABLED"] = "false"  # tests drive delivery explicitly
+os.environ["WMS_SHOPIFY_SYNC_ENABLED"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

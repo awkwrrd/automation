@@ -395,6 +395,7 @@ class OrderSummary(ORM):
     requested_ship_date: date | None
     created_at: datetime
     shipped_at: datetime | None
+    shopify_fulfillment_status: str | None = None
     units: int = 0
     line_count: int = 0
 
@@ -408,6 +409,8 @@ class OrderOut(OrderSummary):
     ship_postal_code: str | None
     ship_country: str | None
     notes: str | None
+    shopify_order_id: str | None = None
+    shopify_fulfillment_error: str | None = None
     lines: list[OrderLineOut]
     shipments: list[ShipmentOut]
 

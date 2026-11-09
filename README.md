@@ -69,6 +69,7 @@ WMS_DATABASE_URL=postgresql+psycopg://user:pass@localhost/wms_test pytest  # Pos
 | **Replenishment report** | Items at or below their reorder point, with suggested order qty and cost |
 | **Configuration** | Multi-warehouse, zones, locations (plus bulk generation such as aisles A–D × bays 1–10 × levels 1–4), suppliers, users |
 | **Integrations** | Push events (`wave.released`, `order.released`, `putaway.created`, `task.cancelled`) to external systems such as a robotics platform, routed by warehouse and zone, as standard events or one PascalCase message per order (field renames and fixed fields configurable). Signed (HMAC), ordered, retried, with a message log. API keys + a bulk task-confirmation API for the response leg. See [docs/SOFTBOT_INTEGRATION.md](docs/SOFTBOT_INTEGRATION.md) |
+| **Shopify** | Connect a store (Dev Dashboard app or existing token): import products and orders (polling, no public URL needed), cancel on Shopify cancellation, fulfillment + tracking on ship, push on-hand stock. See [docs/SHOPIFY.md](docs/SHOPIFY.md) |
 | **Security** | Token auth with three roles: **Operator** (floor execution), **Supervisor** (adjustments, order/wave/count control, item master), **Admin** (config & users) |
 
 ### Inventory model (important for Shopify sync)
@@ -100,13 +101,9 @@ All quantity changes go through `services/inventory.py`, so the balances and the
 
 ## Roadmap (next stages)
 
-**Stage 2: Shopify integration**
-- Store connection (custom app access token) and a mapping from `warehouse.shopify_location_id` to Shopify locations
-- Product/variant import into Items (the Shopify ID columns already exist)
-- `orders/create`, `orders/updated` and `orders/cancelled` webhooks (with HMAC verification) → `POST /api/orders` with `channel=SHOPIFY`, `external_id=<order id>`; dedupe is already enforced
-- Push available-to-sell to Shopify `inventoryLevels` whenever it changes. The recommended approach is an outbox
-  table written in the same DB transaction as `InventoryTransaction`, so no update is lost
-- On ship, create a Shopify fulfillment with the tracking number from the shipment
+**Stage 2: Shopify integration** (done, see [docs/SHOPIFY.md](docs/SHOPIFY.md))
+- Next: order webhooks for instant import (needs a public HTTPS URL), multiple stores/locations,
+  returns from Shopify into receiving
 
 **Hardening / later**
 - Alembic migrations (replacing `create_all`) for schema evolution

@@ -39,6 +39,7 @@ class Settings:
         self.public_url: str = os.getenv("WMS_PUBLIC_URL", "http://localhost:8000").rstrip("/")
         # Background delivery of outbound integration messages
         self.dispatcher_enabled: bool = _bool("WMS_DISPATCHER_ENABLED", "true")
+        self.shopify_sync_enabled: bool = _bool("WMS_SHOPIFY_SYNC_ENABLED", "true")
         self.dispatch_interval: float = float(os.getenv("WMS_DISPATCH_INTERVAL_SECONDS", "2"))
 
 

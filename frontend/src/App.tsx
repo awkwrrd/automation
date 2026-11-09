@@ -25,6 +25,7 @@ import Suppliers from "./pages/Suppliers";
 import Users from "./pages/Users";
 import Integrations from "./pages/Integrations";
 import MessageLog from "./pages/MessageLog";
+import Shopify from "./pages/Shopify";
 
 export default function App() {
   const { user, ready } = useApp();
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="config/users" element={<Users />} />
         <Route path="config/integrations" element={<Integrations />} />
         <Route path="config/messages" element={<MessageLog />} />
+        <Route path="shopify" element={<Shopify />} />
         <Route path="*" element={<div className="empty">Page not found</div>} />
       </Route>
     </Routes>
