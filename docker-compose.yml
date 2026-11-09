@@ -1,0 +1,25 @@
+# One-command stack: PostgreSQL + WMS.  `docker compose up --build`  ->  http://localhost:8000
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wms
+      POSTGRES_PASSWORD: wms
+      POSTGRES_DB: wms
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wms"]
+      interval: 3s
+      retries: 20
+  wms:
+    build: .
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      WMS_DATABASE_URL: postgresql+psycopg://wms:wms@db:5432/wms
+      WMS_SECRET_KEY: ${WMS_SECRET_KEY:-change-me}
+      WMS_ADMIN_PASSWORD: ${WMS_ADMIN_PASSWORD:-admin}
+      WMS_SEED_DEMO_DATA: ${WMS_SEED_DEMO_DATA:-true}
+volumes:
+  pgdata:

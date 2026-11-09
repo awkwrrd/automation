@@ -1,0 +1,12 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0.30
+pydantic>=2.7
+python-multipart>=0.0.9
+# Database drivers - install the one matching your WMS_DATABASE_URL
+psycopg[binary]>=3.1     # PostgreSQL:  postgresql+psycopg://user:pass@host/db
+# pymysql>=1.1           # MySQL/MariaDB: mysql+pymysql://user:pass@host/db
+# pyodbc>=5.1            # SQL Server:  mssql+pyodbc://...
+# testing
+pytest>=8
+httpx>=0.27
