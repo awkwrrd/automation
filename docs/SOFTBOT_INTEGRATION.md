@@ -43,6 +43,11 @@ The WMS **pushes** events to external systems over HTTPS (JSON `POST`). Your sys
 Set `WMS_PUBLIC_URL` in `.env` to the address SOFTBOT should use to reach the WMS (default
 `http://localhost:8000`). It is included in every payload as `callbacks.confirm_tasks`.
 
+> **Running the WMS with Docker Compose?** Inside the container, `localhost` means the container itself.
+> If SOFTBOT (or `tools/mock_softbot.py`) runs on the same PC, use `http://host.docker.internal:9000/...`
+> as the endpoint URL. If it runs on another machine, use that machine's IP or hostname. Compose reads `.env`
+> from the project folder, so `WMS_PUBLIC_URL` set there is passed into the container.
+
 ## 2. Try it with the reference receiver
 
 `tools/mock_softbot.py` is a working receiver (standard library only). Use it as the skeleton for your SOFTBOT:

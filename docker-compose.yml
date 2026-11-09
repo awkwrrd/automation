@@ -21,5 +21,9 @@ services:
       WMS_SECRET_KEY: ${WMS_SECRET_KEY:-change-me}
       WMS_ADMIN_PASSWORD: ${WMS_ADMIN_PASSWORD:-admin}
       WMS_SEED_DEMO_DATA: ${WMS_SEED_DEMO_DATA:-true}
+      # Address external systems (e.g. SOFTBOT) use to reach the WMS; sent in event payloads
+      WMS_PUBLIC_URL: ${WMS_PUBLIC_URL:-http://localhost:8000}
+    # lets the container reach services on the host PC as http://host.docker.internal:<port>
+    extra_hosts: ["host.docker.internal:host-gateway"]
 volumes:
   pgdata:
