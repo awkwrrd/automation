@@ -274,13 +274,14 @@ _WEIGHT = {"POUNDS": "lb", "KILOGRAMS": "kg", "GRAMS": "g", "OUNCES": "oz"}
 
 
 def import_products(db: Session, store: ShopifyStore, client: ShopifyClient) -> dict:
-    stats = {"created": 0, "updated": 0, "skipped_no_sku": 0, "pages": 0}
+    stats = {"created": 0, "updated": 0, "skipped_no_sku": 0, "pages": 0, "variants_found": 0}
     messages: list[str] = []
     after = None
     while True:
         page = client.gql(Q_VARIANTS, {"after": after})["productVariants"]
         stats["pages"] += 1
         for v in page["nodes"]:
+            stats["variants_found"] += 1
             sku = (v.get("sku") or "").strip()
             item = db.scalar(select(Item).where(Item.shopify_variant_id == v["id"]))
             if item is None and sku:
@@ -315,6 +316,8 @@ def import_products(db: Session, store: ShopifyStore, client: ShopifyClient) -> 
         if not page["pageInfo"]["hasNextPage"]:
             break
         after = page["pageInfo"]["endCursor"]
+    if not stats["variants_found"]:
+        messages.append("Shopify returned no products. Add products (with SKUs) to the store, then import again.")
     return {**stats, "messages": messages}
 
 
@@ -382,6 +385,10 @@ def import_orders(db: Session, store: ShopifyStore, client: ShopifyClient) -> di
             break
         after = page["pageInfo"]["endCursor"]
     store.orders_cursor = newest
+    if not stats["checked"]:
+        messages.append(f"Shopify returned no orders created since {since:%Y-%m-%d}"
+                        + (" that changed since the last sync." if store.orders_cursor else ".")
+                        + " Check the 'Import orders created since' date, or create a test order in Shopify.")
     return {**stats, "messages": messages}
 
 

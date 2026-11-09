@@ -11,6 +11,8 @@ function summaryText(r: SyncRun) {
   if (r.error) return <span className="qty-neg">{r.error}</span>;
   if (!r.summary) return "";
   if (r.kind === "TEST") return `${r.summary.shop} · ${(r.summary.locations as Loc[] | undefined)?.length ?? 0} location(s)`;
+  if (r.kind === "PRODUCTS" && r.summary.variants_found === 0) return <span className="qty-neg">Shopify returned no products</span>;
+  if (r.kind === "ORDERS" && r.summary.checked === 0) return <span className="qty-neg">Shopify returned no orders in range</span>;
   return Object.entries(r.summary).filter(([k, v]) => typeof v === "number" && v && k !== "pages").map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`).join(" · ") || "no changes";
 }
 

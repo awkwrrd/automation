@@ -308,3 +308,17 @@ def test_scheduler_tick(client, admin, fake):
     shop_svc.tick(datetime(2026, 11, 9, 15, 5) + timedelta(minutes=6))
     assert len(fake.ops("WmsOrders")) == before + 1
     ok(client.put("/api/shopify/store", headers=admin, json={**STORE, "client_secret": None, "active": False}))
+
+
+def test_empty_store_is_explained(client, admin, fake):
+    saved_variants, saved_orders = fake.variants, fake.orders
+    fake.variants, fake.orders = [], []
+    try:
+        ok(client.put("/api/shopify/store", headers=admin, json={**STORE, "client_secret": None,
+                                                                  "orders_since": "2026-11-08T00:00:00"}))
+        run = ok(client.post("/api/shopify/import-products", headers=admin))
+        assert run["summary"]["variants_found"] == 0 and "no products" in run["summary"]["messages"][0]
+        run = ok(client.post("/api/shopify/sync-orders", headers=admin))
+        assert run["summary"]["checked"] == 0 and "no orders created since 2026-11-08" in run["summary"]["messages"][0]
+    finally:
+        fake.variants, fake.orders = saved_variants, saved_orders
