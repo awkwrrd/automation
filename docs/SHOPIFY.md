@@ -22,6 +22,14 @@ Use the Dev Dashboard instead. Your **dev store and the app must be in the same 
    - `read_orders`
    - `read_merchant_managed_fulfillment_orders`, `write_merchant_managed_fulfillment_orders`
    - optional: `read_all_orders`, only needed to import orders older than 60 days
+
+   The Scopes box takes a comma-separated list. Paste this line:
+   ```
+   read_products,read_inventory,write_inventory,read_locations,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders
+   ```
+   Other fields on that page: **App URL** isn't used by the WMS, so leave the placeholder (e.g.
+   `https://example.com`). **Untick** *Embed app in Shopify admin*. Leave *Allowed redirection URL(s)* empty
+   and *Use legacy install flow* unticked.
 3. **Release** the version, then **Install** the app on your dev store.
 4. Open the app's **Settings** and copy the **Client ID** and **Client secret**.
 
