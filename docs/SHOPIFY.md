@@ -13,6 +13,19 @@ Shopify, Shopify never calls the WMS. It therefore works from a PC or private ne
 
 ## 1. Create the app in the Shopify Dev Dashboard
 
+> **Important: orders are "protected customer data".** Shopify won't let an app read the Order object at all
+> (`This app is not approved to access the Order object`) until the app has protected customer data
+> access. What worked (November 2026):
+> - Create the app in a **Partner organization** (free at <https://partners.shopify.com>), together with a
+>   **development store** in that same organization. An app created from a store's own (merchant)
+>   organization has no option to get this access, at least on a store without a paid plan.
+> - In the Partner Dashboard, open the app → **Distribution** → **Custom distribution**. Enter the dev store's
+>   domain and generate the install link.
+> - Install the app **through that link**. The install screen should list *View customer data → Sensitive
+>   data: name, email, phone, address*. No "Protected customer data access" request card appeared under
+>   *API access requests*, and none was needed: custom distribution granted it.
+> - The client ID/secret login only works when the app and the store are in the **same organization**.
+
 Since January 2026 Shopify no longer lets you create custom apps (and copy a token) inside the store admin.
 Use the Dev Dashboard instead. Your **dev store and the app must be in the same Shopify organization**.
 
@@ -87,6 +100,7 @@ Then use **Push all** once, and turn on the automatic push.
 - `shop_not_permitted`: the app and the store aren't in the same organization.
 - Fulfillment **FAILED** on an order: the reason shows on the order. Fix it in Shopify (e.g. order on hold),
   then click **Retry Shopify fulfillment** on the order.
-- Customer name/address blank on imported orders: request *protected customer data* access (name, email,
-  phone, address) for the app in the Dev Dashboard, then reinstall.
+- `This app is not approved to access the Order object`, or blank customer names/addresses: the app lacks
+  protected customer data access. See the note at the top of section 1 (Partner organization + custom
+  distribution, then reinstall through the custom install link).
 - Run the WMS as one process (the default), so only one background sync runs.
