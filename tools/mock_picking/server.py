@@ -1,7 +1,8 @@
 """Stand-in for a picking system (KFX, AutoStore, ...) during proofs of concept.
 
 Accepts what an outbound signal_to_http SOFTBOT sends and answers like a healthy system:
-  POST <any path>          JSON body -> 200 {"accepted": true, ...} and the message is recorded
+  POST <any path>          JSON body -> 200 {"Success": true, "ErrorCode": 0, "TransactionId": ..., ...}
+                           and the message is recorded
   POST /token              OAuth2 client-credentials token endpoint (for AuthType "OAuth2")
   GET  /                   web page listing the received messages (newest first, auto-refresh)
   GET  /_messages          the same as JSON;  DELETE /_messages clears them
@@ -181,10 +182,15 @@ def make_handler(args):
                                  "summary": summarize(body),
                                  "content_type": self.headers.get("Content-Type"), "body_pretty": pretty})
             print(f"[{now()}] #{mid} {self.command} {self.path} auth={auth} -> {status} {summarize(body)}", flush=True)
+            # Reply in the shape KFX-style SOFTBOT workflows check: TransactionId / ErrorCode / Success / Description
+            txn = body.get("TransactionId") if isinstance(body, dict) else None
+            reply = {"TransactionId": txn or f"mock-{mid}", "id": mid, "received_at": now()}
             if 200 <= status < 300:
-                return self._send(status, {"accepted": True, "id": mid, "received_at": now()})
-            return self._send(status, {"accepted": False, "id": mid,
-                                       "error": f"unauthorized: {reject}" if reject else f"simulated HTTP {status}"})
+                return self._send(status, {**reply, "ErrorCode": 0, "Success": True, "accepted": True,
+                                           "Description": "Accepted by mock picking system"})
+            desc = f"unauthorized: {reject}" if reject else f"simulated HTTP {status}"
+            return self._send(status, {**reply, "ErrorCode": status, "Success": False, "accepted": False,
+                                       "Description": desc, "error": desc})
 
         def _token(self, raw: bytes):
             form = {k: v[0] for k, v in parse_qs(raw.decode()).items()}
