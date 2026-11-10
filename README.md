@@ -38,6 +38,10 @@ To serve the GUI from the API instead, run `npm run build` once. FastAPI then se
 **Demo logins** (seeded on first start against an empty DB): `admin/admin`, `supervisor/supervisor`, `operator/operator`.
 Set `WMS_SEED_DEMO_DATA=false` for a clean production database. Only the admin user is created then.
 
+### Running it on a Linux server
+See [docs/DEPLOY.md](docs/DEPLOY.md): Docker install on Ubuntu, moving data from another machine, updates,
+backups and a checklist before others use it.
+
 ### Plugging in your database
 Set `WMS_DATABASE_URL` to any SQLAlchemy URL (see `.env.example`). On startup the app creates any missing tables.
 The schema stores enumerations as plain strings and uses no vendor-specific types, so it ports across engines.

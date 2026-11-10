@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: wms
       POSTGRES_DB: wms
     volumes: [pgdata:/var/lib/postgresql/data]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wms"]
       interval: 3s
@@ -14,6 +15,7 @@ services:
   wms:
     build: .
     ports: ["8000:8000"]
+    restart: unless-stopped
     depends_on:
       db: { condition: service_healthy }
     environment:
