@@ -122,6 +122,8 @@ Q_FULFILLMENT_ORDERS = """query WmsFulfillmentOrders($id: ID!) {
   }
 }"""
 
+Q_LOCATION = """query WmsLocation($id: ID!) { location(id: $id) { id name isActive } }"""
+
 Q_STOCK = """query WmsStockLevels($ids: [ID!]!, $loc: ID!) {
   nodes(ids: $ids) {
     ... on InventoryItem { id tracked inventoryLevel(locationId: $loc) { quantities(names: ["on_hand"]) { name quantity } } }
@@ -529,6 +531,7 @@ def push_inventory(db: Session, store: ShopifyStore, client: ShopifyClient, *, f
     wh = store.warehouse
     if wh is None or not wh.shopify_location_id:
         raise WMSError("Map the WMS warehouse to a Shopify location first")
+    check_location(client, wh.shopify_location_id)
     qty = on_hand_by_item(db, wh.id)
     items = db.scalars(select(Item).where(Item.shopify_inventory_item_id.is_not(None))).all()
     todo = [(it, qty.get(it.id, 0)) for it in items if full or it.shopify_synced_qty != qty.get(it.id, 0)]
@@ -564,6 +567,16 @@ def push_inventory(db: Session, store: ShopifyStore, client: ShopifyClient, *, f
     return {**stats, "messages": messages}
 
 
+def check_location(client: ShopifyClient, location_gid: str) -> dict:
+    """Make sure the mapped location belongs to the connected store (it won't after switching stores)."""
+    loc = client.gql(Q_LOCATION, {"id": location_gid}).get("location")
+    if not loc:
+        raise WMSError("The Shopify location mapped to this warehouse doesn't exist in the connected store "
+                       "(did you switch stores?). Click Test connection, choose the location under "
+                       "'Shopify location for this warehouse', Save, and try again.")
+    return loc
+
+
 def import_stock(db: Session, store: ShopifyStore, client: ShopifyClient, *, location_id: int) -> dict:
     """One-time starting stock: put Shopify's on-hand (at the mapped location) into a WMS location, for items
     that have no stock in the WMS warehouse yet. Safe to run again: items that already have stock are skipped."""
@@ -574,6 +587,8 @@ def import_stock(db: Session, store: ShopifyStore, client: ShopifyClient, *, loc
     loc = db.get(Location, location_id)
     if loc is None or loc.warehouse_id != wh.id or not loc.active:
         raise WMSError("Choose an active location in the mapped warehouse")
+    shop_loc = check_location(client, wh.shopify_location_id)
+    not_stocked: list[str] = []
     have = on_hand_by_item(db, wh.id)
     have_any = {i for i, in db.execute(  # any status counts as "already has stock"
         select(InventoryBalance.item_id).join(Location, Location.id == InventoryBalance.location_id)
@@ -595,6 +610,7 @@ def import_stock(db: Session, store: ShopifyStore, client: ShopifyClient, *, loc
                 continue
             if level is None:
                 stats["not_stocked_in_shopify"] += 1
+                not_stocked.append(it.sku)
                 continue
             qty = next((q["quantity"] for q in level["quantities"] if q["name"] == "on_hand"), 0)
             if it.id in have_any:
@@ -613,7 +629,11 @@ def import_stock(db: Session, store: ShopifyStore, client: ShopifyClient, *, loc
             it.shopify_synced_qty = have.get(it.id, 0) + qty
             stats["imported_items"] += 1
             stats["imported_units"] += qty
-    messages.insert(0, f"Stock placed in {loc.code}. Move it to pick locations with Move / move tasks as needed.")
+    if not_stocked:
+        messages.append(f"Not stocked at Shopify location '{shop_loc['name']}' (turn on 'Track quantity' and stock "
+                        f"them at that location in Shopify): {', '.join(not_stocked[:50])}")
+    messages.insert(0, f"Read on-hand from Shopify location '{shop_loc['name']}'. Stock placed in {loc.code}"
+                       + (". Move it to pick locations with Move / move tasks as needed." if stats["imported_items"] else "."))
     return {**stats, "messages": messages}
 
 

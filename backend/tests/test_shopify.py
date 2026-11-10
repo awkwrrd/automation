@@ -120,6 +120,9 @@ class FakeShopify:
 
     stock: dict = {"gid://shopify/InventoryItem/1": 40, "gid://shopify/InventoryItem/2": 7}
 
+    def op_WmsLocation(self, v):
+        return {"location": {"id": LOC, "name": "Main warehouse", "isActive": True} if v["id"] == LOC else None}
+
     def op_WmsStockLevels(self, v):
         assert v["loc"] == LOC
         return {"nodes": [{"id": i, "tracked": True,
@@ -351,3 +354,18 @@ def test_import_stock(client, admin, fake):
     run = ok(client.post("/api/shopify/import-stock", headers=admin, params={"location_id": bin_["id"]}))
     assert run["summary"]["imported_items"] == 0 and run["summary"]["skipped_has_stock"] == 2
     assert client.get(f"/api/items/{tee['id']}", headers=admin).json()["on_hand"] == tee["on_hand"]
+
+
+def test_wrong_location_is_explained(client, admin, fake):
+    bin_ = client.get("/api/locations/lookup", params={"code": "B-06-01"}, headers=admin).json()
+    ok(client.put("/api/shopify/store", headers=admin, json={**STORE, "client_secret": None,
+                                                              "shopify_location_id": "gid://shopify/Location/999"}))
+    try:
+        for path, params in (("/api/shopify/import-stock", {"location_id": bin_["id"]}), ("/api/shopify/push-inventory", {})):
+            run = ok(client.post(path, headers=admin, params=params))
+            assert run["status"] == "ERROR" and "switch stores" in run["error"], run
+    finally:
+        ok(client.put("/api/shopify/store", headers=admin, json={**STORE, "client_secret": None}))
+    fake.stock.pop("gid://shopify/InventoryItem/2", None)
+    run = ok(client.post("/api/shopify/import-stock", headers=admin, params={"location_id": bin_["id"]}))
+    assert "Main warehouse" in run["summary"]["messages"][0]
