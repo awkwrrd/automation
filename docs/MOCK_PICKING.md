@@ -51,7 +51,8 @@ mock a public HTTPS address.
    and put the key in the `<edge tech>Password` secret.
 5. Watch messages arrive at `http://localhost:9100/?key=<key>`.
 
-The quick-tunnel address **changes every time the tunnel restarts**, so update `BaseUrl` after a restart.
+Stop everything with `docker compose --profile tunnel down` (a plain `docker compose down` leaves the
+tunnel running). The quick-tunnel address **changes every time the tunnel restarts**, so update `BaseUrl` after a restart.
 For a fixed address use a named Cloudflare tunnel (free Cloudflare account + your own domain) or an ngrok
 static domain. A corporate network may block tunnels; if `docker compose logs tunnel` shows connection
 errors, try another network or ask IT.

@@ -72,7 +72,8 @@ docker compose exec -T db psql -U wms -d wms -v ON_ERROR_STOP=1 -q -f /tmp/wms.s
 docker compose --profile tunnel up -d --build  # now start everything
 rm wms.sql                                     # it contains secrets (Shopify, endpoints, users)
 ```
-Then **stop the old machine's stack** (`docker compose down` there). Two WMS copies connected to the same
+Then **stop the old machine's stack** (`docker compose --profile tunnel down` there; without `--profile tunnel`
+the tunnel container is left running). Two WMS copies connected to the same
 Shopify store would both import orders, push stock and create fulfillments.
 
 ## 5. Check and connect
@@ -81,7 +82,8 @@ Shopify store would both import orders, push stock and create fulfillments.
 - Firewall: if `sudo ufw status` says *active*, allow the ports: `sudo ufw allow 8000/tcp` and `sudo ufw allow 9100/tcp`.
 - New tunnel address for the cloud SOFTBOT: `docker compose logs tunnel | grep trycloudflare` and update the
   SOFTBOT's URL.
-- Logs: `docker compose logs -f wms` (Ctrl+C to stop following). Status: `docker compose ps`.
+- Logs: `docker compose logs -f wms` (Ctrl+C to stop following). Status: `docker compose --profile tunnel ps`.
+- Stop everything: `docker compose --profile tunnel down` (a plain `docker compose down` skips the tunnel).
 
 ## Updating to a new version
 
