@@ -118,6 +118,14 @@ class FakeShopify:
         return {"inventorySetQuantities": {"inventoryAdjustmentGroup": {"reason": "correction", "changes": []},
                                            "userErrors": errs}}
 
+    stock: dict = {"gid://shopify/InventoryItem/1": 40, "gid://shopify/InventoryItem/2": 7}
+
+    def op_WmsStockLevels(self, v):
+        assert v["loc"] == LOC
+        return {"nodes": [{"id": i, "tracked": True,
+                           "inventoryLevel": {"quantities": [{"name": "on_hand", "quantity": self.stock[i]}]}
+                           if i in self.stock else None} for i in v["ids"]]}
+
     def ops(self, name):
         return [vars_ for op, vars_ in self.calls if op == name]
 
@@ -322,3 +330,24 @@ def test_empty_store_is_explained(client, admin, fake):
         assert run["summary"]["checked"] == 0 and "no orders created since 2026-11-08" in run["summary"]["messages"][0]
     finally:
         fake.variants, fake.orders = saved_variants, saved_orders
+
+
+def test_import_stock(client, admin, fake):
+    tee = client.get("/api/items/lookup", params={"code": "TS-BLK-S"}, headers=admin).json()   # has WMS stock
+    new = client.get("/api/items/lookup", params={"code": "NEW-SKU-1"}, headers=admin).json()  # none yet
+    assert new["on_hand"] == 0
+    bin_ = client.get("/api/locations/lookup", params={"code": "B-06-01"}, headers=admin).json()
+    run = ok(client.post("/api/shopify/import-stock", headers=admin, params={"location_id": bin_["id"]}))
+    assert run["status"] == "OK", run
+    s = run["summary"]
+    assert s["imported_items"] == 1 and s["imported_units"] == 7 and s["skipped_has_stock"] == 1
+    new = client.get(f"/api/items/{new['id']}", headers=admin).json()
+    assert new["on_hand"] == 7
+    bals = ok(client.get("/api/inventory/balances", headers=admin, params={"item_id": new["id"]}))["items"]
+    assert [(b["location"]["code"], b["qty_on_hand"]) for b in bals] == [("B-06-01", 7)]
+    txn = ok(client.get("/api/inventory/transactions", headers=admin, params={"item_id": new["id"]}))["items"][0]
+    assert txn["reason_code"] == "SHOPIFY_IMPORT" and txn["qty"] == 7
+    # running again doesn't double up
+    run = ok(client.post("/api/shopify/import-stock", headers=admin, params={"location_id": bin_["id"]}))
+    assert run["summary"]["imported_items"] == 0 and run["summary"]["skipped_has_stock"] == 2
+    assert client.get(f"/api/items/{tee['id']}", headers=admin).json()["on_hand"] == tee["on_hand"]

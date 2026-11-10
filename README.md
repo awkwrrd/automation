@@ -49,6 +49,19 @@ pytest                                                                     # SQL
 WMS_DATABASE_URL=postgresql+psycopg://user:pass@localhost/wms_test pytest  # Postgres
 ```
 
+### Resetting the database
+```bash
+docker compose exec wms python -m app.reset          # wipe items, stock, orders, tasks and history; keep setup
+docker compose exec wms python -m app.reset --all    # wipe everything (as a fresh install)
+```
+The default keeps users, warehouses/zones/locations, suppliers, integration endpoints (SOFTBOT) and the
+Shopify connection, and restarts document numbers. `--all` re-creates the database from scratch. It seeds
+demo data again unless `WMS_SEED_DEMO_DATA=false` is set in `.env`. Without Docker: `python -m app.reset`
+from `backend/`.
+
+To start from Shopify only: reset, then on the **Shopify** page run *Import products*, then
+*Import stock from Shopify…* (copies Shopify's on-hand into a WMS location you choose), then *Sync orders now*.
+
 ---
 
 ## What's in stage 1

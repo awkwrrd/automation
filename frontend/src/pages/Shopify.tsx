@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useApp } from "../context";
-import { Card, DataTable, ErrorBox, Field, Input, Modal, PageHeader, Pager, Pill, Select, fmtDateTime, useAction, useLoad } from "../components/ui";
+import { Card, DataTable, ErrorBox, Field, Input, LocationPicker, Modal, PageHeader, Pager, Pill, Select, fmtDateTime, useAction, useLoad } from "../components/ui";
 import type { Page, ShopifyStore, SyncRun } from "../types";
 
 type Loc = { id: string; name: string; active: boolean };
-const KIND_LABEL: Record<string, string> = { TEST: "Connection test", PRODUCTS: "Product import", ORDERS: "Order sync", FULFILLMENTS: "Fulfillments", INVENTORY: "Inventory push" };
+const KIND_LABEL: Record<string, string> = { TEST: "Connection test", PRODUCTS: "Product import", ORDERS: "Order sync", FULFILLMENTS: "Fulfillments", INVENTORY: "Inventory push", STOCK_IMPORT: "Starting stock import" };
 
 function summaryText(r: SyncRun) {
   if (r.error) return <span className="qty-neg">{r.error}</span>;
@@ -25,12 +25,14 @@ export default function Shopify() {
   const runs = useLoad(() => api.get<Page<SyncRun>>("/shopify/runs", { limit: 25, offset }), [offset]);
   const lastTest = useLoad(() => api.get<Page<SyncRun>>("/shopify/runs", { kind: "TEST", status: "OK", limit: 1 }), []);
   const [open, setOpen] = useState<SyncRun | null>(null);
+  const [stockModal, setStockModal] = useState(false);
+  const [stockLoc, setStockLoc] = useState<{ id: number; code: string } | null>(null);
   const s = store.data;
   const locations = ((lastTest.data?.items[0]?.summary?.locations as Loc[] | undefined) ?? []);
   const missing = (lastTest.data?.items[0]?.summary?.missing_scopes as string[] | undefined) ?? [];
 
   const refresh = () => { store.reload(); runs.reload(); lastTest.reload(); };
-  const action = async (path: string, params?: Record<string, string | boolean>) => {
+  const action = async (path: string, params?: Record<string, string | boolean | number>) => {
     const r = await run(() => api.post<SyncRun>(path, undefined, params));
     if (r) { refresh(); if (r.status === "ERROR" || (r.summary?.messages?.length ?? 0) > 0 || r.kind === "TEST") setOpen(r); }
   };
@@ -55,8 +57,26 @@ export default function Shopify() {
             <ActionTile title="Inventory" text={s.push_inventory ? "Pushes changed on-hand quantities." : "Automatic push is off (turn on below once stock is counted)."}
               button="Push changes" busy={busy} onClick={() => action("/shopify/push-inventory")}
               extra={<button className="btn btn-sm" disabled={busy} onClick={() => action("/shopify/push-inventory", { full: true })}>Push all</button>} />
+            {admin && <ActionTile title="Starting stock" text="One-time: copy Shopify's on-hand quantities into a WMS location, for products that have no WMS stock yet."
+              button="Import stock from Shopify…" busy={busy} onClick={() => setStockModal(true)} />}
           </div>
         </Card>
+      )}
+      {stockModal && (
+        <Modal title="Import starting stock from Shopify" onClose={() => setStockModal(false)} footer={<>
+          <button className="btn" onClick={() => setStockModal(false)}>Cancel</button>
+          <button className="btn btn-primary" disabled={busy || !stockLoc} onClick={async () => {
+            setStockModal(false); await action("/shopify/import-stock", { location_id: stockLoc!.id });
+          }}>Import</button>
+        </>}>
+          <p style={{ marginTop: 0 }}>Reads each product's <b>on-hand</b> quantity at the mapped Shopify location and adds it to the WMS location below (reason <code>SHOPIFY_IMPORT</code>).</p>
+          <ul className="muted" style={{ fontSize: 13, paddingLeft: 18 }}>
+            <li>Only products with <b>no stock in the WMS</b> yet are imported, so running it twice doesn't double up.</li>
+            <li>Run <b>Import products</b> first. Lot-tracked products are skipped (receive them with their lot).</li>
+            <li>Choose a pickable bin to pick from it straight away, or a staging/dock location and move stock afterwards.</li>
+          </ul>
+          <Field label="Put the stock in location"><LocationPicker value={stockLoc} onChange={setStockLoc} /></Field>
+        </Modal>
       )}
       <Card title="Sync log" pad={false} actions={<button className="btn btn-sm" onClick={runs.reload}>Refresh</button>}>
         <DataTable rows={runs.data?.items} loading={runs.loading} rowKey={(r) => r.id} onRowClick={setOpen} empty="Nothing has run yet" columns={[

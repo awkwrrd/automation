@@ -185,6 +185,12 @@ def push_inventory(full: bool = False, db: Session = Depends(get_db)):
     return _manual(db, "INVENTORY", lambda d, s, c: svc.push_inventory(d, s, c, full=full))
 
 
+@router.post("/import-stock", response_model=RunOut, dependencies=[admin])
+def import_stock(location_id: int, db: Session = Depends(get_db)):
+    """One-time: bring Shopify's on-hand quantities into a WMS location (items without WMS stock only)."""
+    return _manual(db, "STOCK_IMPORT", lambda d, s, c: svc.import_stock(d, s, c, location_id=location_id))
+
+
 @router.post("/fulfillments", response_model=RunOut, dependencies=[supervisor])
 def fulfillments(db: Session = Depends(get_db)):
     return _manual(db, "FULFILLMENTS", svc.process_fulfillments)

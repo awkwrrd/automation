@@ -122,6 +122,12 @@ Q_FULFILLMENT_ORDERS = """query WmsFulfillmentOrders($id: ID!) {
   }
 }"""
 
+Q_STOCK = """query WmsStockLevels($ids: [ID!]!, $loc: ID!) {
+  nodes(ids: $ids) {
+    ... on InventoryItem { id tracked inventoryLevel(locationId: $loc) { quantities(names: ["on_hand"]) { name quantity } } }
+  }
+}"""
+
 M_FULFILL = """mutation WmsFulfill($fulfillment: FulfillmentInput!) {
   fulfillmentCreate(fulfillment: $fulfillment) {
     fulfillment { id status }
@@ -555,6 +561,59 @@ def push_inventory(db: Session, store: ShopifyStore, client: ShopifyClient, *, f
             if i not in bad_rows:
                 it.shopify_synced_qty = q
                 stats["pushed"] += 1
+    return {**stats, "messages": messages}
+
+
+def import_stock(db: Session, store: ShopifyStore, client: ShopifyClient, *, location_id: int) -> dict:
+    """One-time starting stock: put Shopify's on-hand (at the mapped location) into a WMS location, for items
+    that have no stock in the WMS warehouse yet. Safe to run again: items that already have stock are skipped."""
+    from . import inventory as inv_svc
+    wh = store.warehouse
+    if wh is None or not wh.shopify_location_id:
+        raise WMSError("Map the WMS warehouse to a Shopify location first")
+    loc = db.get(Location, location_id)
+    if loc is None or loc.warehouse_id != wh.id or not loc.active:
+        raise WMSError("Choose an active location in the mapped warehouse")
+    have = on_hand_by_item(db, wh.id)
+    have_any = {i for i, in db.execute(  # any status counts as "already has stock"
+        select(InventoryBalance.item_id).join(Location, Location.id == InventoryBalance.location_id)
+        .where(Location.warehouse_id == wh.id, InventoryBalance.qty_on_hand != 0)).all()}
+    items = db.scalars(select(Item).where(Item.shopify_inventory_item_id.is_not(None))).all()
+    stats = {"imported_items": 0, "imported_units": 0, "skipped_has_stock": 0, "skipped_zero": 0,
+             "skipped_lot_tracked": 0, "not_stocked_in_shopify": 0}
+    messages: list[str] = []
+    by_inv = {it.shopify_inventory_item_id: it for it in items}
+    ids = list(by_inv)
+    for start in range(0, len(ids), 50):
+        data = client.gql(Q_STOCK, {"ids": ids[start:start + 50], "loc": wh.shopify_location_id})
+        for node in data["nodes"]:
+            if not node:
+                continue
+            it = by_inv.get(node["id"])
+            level = node.get("inventoryLevel")
+            if it is None:
+                continue
+            if level is None:
+                stats["not_stocked_in_shopify"] += 1
+                continue
+            qty = next((q["quantity"] for q in level["quantities"] if q["name"] == "on_hand"), 0)
+            if it.id in have_any:
+                stats["skipped_has_stock"] += 1
+                continue
+            if qty <= 0:
+                stats["skipped_zero"] += 1
+                continue
+            if it.lot_tracked:
+                stats["skipped_lot_tracked"] += 1
+                messages.append(f"{it.sku}: lot-tracked, receive it with its lot number instead ({qty} in Shopify)")
+                continue
+            inv_svc.adjust(db, item_id=it.id, location_id=loc.id, qty_delta=qty, reason_code="SHOPIFY_IMPORT",
+                           username=SYNC_USER, reference_type="SHOPIFY", reference_number=store.shop_domain[:64],
+                           notes="Starting stock imported from Shopify")
+            it.shopify_synced_qty = have.get(it.id, 0) + qty
+            stats["imported_items"] += 1
+            stats["imported_units"] += qty
+    messages.insert(0, f"Stock placed in {loc.code}. Move it to pick locations with Move / move tasks as needed.")
     return {**stats, "messages": messages}
 
 

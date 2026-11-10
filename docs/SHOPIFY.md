@@ -66,7 +66,15 @@ Use the Dev Dashboard instead. Your **dev store and the app must be in the same 
 
 The WMS exchanges the client ID and secret for a 24-hour token and renews it automatically.
 
-## 3. Inventory: turn it on last
+## 3. Starting stock: import it once
+
+The product import brings products, not quantities. To start the WMS with the stock Shopify already has, use
+**Import stock from Shopify…** (Admin). It reads each product's on-hand at the mapped Shopify location and adds
+it, reason `SHOPIFY_IMPORT`, to the WMS location you choose. Only products with no WMS stock yet are imported,
+so it's safe to run again after importing more products. Lot-tracked products are skipped (receive them with
+their lot). Pick a pickable bin to pick from it straight away, or a dock/staging location and move it later.
+
+## 4. Inventory push: turn it on last
 
 *Push stock levels to Shopify* **overwrites** Shopify's on-hand quantity at the mapped location with the WMS
 quantity, so leave it off until the WMS stock is right (receive or cycle-count your real stock first).
@@ -80,7 +88,7 @@ Then use **Push all** once, and turn on the automatic push.
 - The item must be tracked and stocked at that Shopify location. Otherwise the push notes
   "not stocked at the location" for that SKU.
 
-## 4. How orders come across
+## 5. How orders come across
 
 - Imported: unfulfilled, shippable line items (`unfulfilledQuantity`). Skipped: cancelled orders, fully
   fulfilled ones, payment voided/refunded/expired, and test orders if you untick *Include test orders*.
@@ -92,7 +100,7 @@ Then use **Push all** once, and turn on the automatic push.
   After release, the change is only noted in the sync log for you to handle.
 - Re-syncing never creates duplicates.
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 - **Sync log** (bottom of the Shopify page): every run with counts. Click a row for its notes or error.
 - `app_not_installed`: the app was created but not installed on that store, or the store domain points at a
